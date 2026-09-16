@@ -1,0 +1,17 @@
+{
+  "name": "back-sys-conta-hme",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
