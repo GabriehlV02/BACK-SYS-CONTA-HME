@@ -13,5 +13,8 @@
     "fastify": "latest",
     "tsx": "latest",
     "typescript": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1"
   }
 }
