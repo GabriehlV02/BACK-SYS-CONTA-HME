@@ -1,0 +1,54 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import Fastify from 'fastify';
+import { registrarInventario } from './inventario.js';
+
+test('precio global, alertas persistentes, FIFO, atomicidad e idempotencia', async () => {
+  const archivo = join(mkdtempSync(join(tmpdir(), 'hme-stock-')), 'inventario.json');
+  const app = Fastify(); registrarInventario(app, archivo);
+  async function request(method: 'GET' | 'POST' | 'PUT', url: string, payload?: object, status = 200) {
+    const r = await app.inject({ method, url, payload }); assert.equal(r.statusCode, status, r.body); return r.json().data;
+  }
+  const base = { codigo: 'PAR-1G', nombre: 'Paracetamol 1 gramo', unidadMedida: 'Unidad', tipo: 'PRODUCTO', categoria: 'Medicamentos', grupo: 'Analgesicos', descripcion: '', estado: 'ACTIVO', precioVenta: 2 };
+  await request('POST', '/api/inventario', base);
+  const ingreso = (id: string, marca: string, fecha: string, costoUnitario: number, cantidad = 2, almacen = 'Farmacia') => ({ id, fecha, almacen, proveedor: marca, comprobante: id, lineas: [{ id, codigo: base.codigo, marca, lote: id, cantidad, costoUnitario, vence: '2099-12-31' }] });
+  await request('POST', '/api/adquisiciones', ingreso('enero', 'Bago', '2026-01-01', 1));
+  await request('POST', '/api/adquisiciones', ingreso('abril', 'Cofar', '2026-04-01', 2.5));
+  let [item] = await request('GET', '/api/inventario');
+  assert.equal(item.precioVenta, 2.5); assert.equal(item.revisionPrecio, true);
+  await request('POST', '/api/adquisiciones', ingreso('septiembre', 'China', '2026-09-01', 0.5));
+  await request('POST', '/api/adquisiciones', ingreso('septiembre', 'China', '2026-09-01', 0.5));
+  [item] = await request('GET', '/api/inventario'); assert.equal(item.stock, 6); assert.equal(item.precioVenta, 2.5); assert.equal(item.revisionPrecio, true);
+  assert.equal((await request('GET', '/api/inventario/avisos')).length, 2);
+  await request('PUT', '/api/inventario/1', { ...item, precioVenta: 2, confirmarPrecio: true }, 400);
+  await request('PUT', '/api/inventario/1', { ...item, precioVenta: 3 });
+  [item] = await request('GET', '/api/inventario'); assert.equal(item.revisionPrecio, true);
+  await request('PUT', '/api/inventario/1', { ...item, confirmarPrecio: true });
+  [item] = await request('GET', '/api/inventario'); assert.equal(item.revisionPrecio, false);
+  const venta = (id: string, cantidad: number, precio = 3) => ({ id, almacen: 'Farmacia', lineas: [{ codigo: base.codigo, cantidad, precio }], descuento: 0, pagado: 100 });
+  await request('POST', '/api/ventas', venta('precio-viejo', 1, 2), 400);
+  await request('POST', '/api/ventas', venta('sin-stock', 7), 400);
+  await request('POST', '/api/ventas', { ...venta('descuento', 3), descuento: 8 }, 400);
+  const vencido = ingreso('vencido', 'X', '2026-01-01', 1);
+  vencido.lineas[0].vence = '2020-01-01';
+  await request('POST', '/api/adquisiciones', vencido, 400);
+  assert.equal((await request('GET', '/api/inventario'))[0].stock, 6);
+  const v = await request('POST', '/api/ventas', venta('venta-1', 3));
+  assert.deepEqual(v.lineas[0].salidas.map((s: any) => [s.marca, s.cantidad]), [['Bago', 2], ['Cofar', 1]]);
+  await request('POST', '/api/ventas', venta('venta-1', 3));
+  assert.equal((await request('GET', '/api/inventario'))[0].stock, 3);
+  const v2 = await request('POST', '/api/ventas', venta('venta-2', 2));
+  assert.deepEqual(v2.lineas[0].salidas.map((s: any) => [s.marca, s.cantidad]), [['Cofar', 1], ['China', 1]]);
+  await request('POST', '/api/adquisiciones', ingreso('otra', 'Bago', '2026-01-01', 1, 10, 'Otro'));
+  await request('POST', '/api/ventas', venta('otro-almacen', 2), 400);
+  const invalido = ingreso('invalido', 'X', '2026-01-01', 5); invalido.lineas.push({ ...invalido.lineas[0], codigo: 'NO-EXISTE' });
+  await request('POST', '/api/adquisiciones', invalido, 400);
+  assert.equal((await request('GET', '/api/inventario'))[0].precioVenta, 3);
+  await app.close();
+  const reinicio = Fastify(); registrarInventario(reinicio, archivo);
+  const r = await reinicio.inject('/api/inventario'); assert.equal(r.json().data[0].stock, 11);
+  await reinicio.close();
+});

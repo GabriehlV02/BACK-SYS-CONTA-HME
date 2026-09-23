@@ -1,3 +1,4 @@
+import { registrarInventario } from './inventario.js';
 import Fastify from 'fastify';
 
 type Sistema = 'contable';
@@ -35,4 +36,5 @@ app.post('/api/login', async (request, reply) => {
     },
   };
 });
+registrarInventario(app);
 app.listen({ port: Number(process.env.PORT ?? 5055), host: '0.0.0.0' });
