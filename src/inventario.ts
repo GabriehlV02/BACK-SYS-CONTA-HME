@@ -16,6 +16,8 @@ const fechaValida = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFin
 const hoy = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz' }).format(new Date());
 const util = (l: Lote) => l.disponible > 0 && (!l.vence || l.vence >= hoy());
 const piso = (s: Estado, codigo: string) => Math.max(0, ...s.lotes.filter(l => l.codigo === codigo && util(l)).map(l => l.costoUnitario));
+const costoMaximoReferencia = (s: Estado, codigo: string, costoNuevo = 0) => Math.max(costoNuevo, ...s.lotes.filter(l => l.codigo === codigo).map(l => l.costoUnitario));
+const precioSugerido = (costo: number) => Math.ceil(costo * 125) / 100;
 
 export function registrarInventario(app: FastifyInstance, archivo = resolve('data/inventario.json')) {
   let estado: Estado = existsSync(archivo) ? JSON.parse(readFileSync(archivo, 'utf8')) : vacio();
@@ -73,14 +75,17 @@ export function registrarInventario(app: FastifyInstance, archivo = resolve('dat
       const anteriores = s.lotes.filter(x => x.codigo === l.codigo).sort((a,b) => b.orden - a.orden);
       const anterior = anteriores[0]?.costoUnitario;
       const precioAnterior = item.precioVenta;
+      const costoMayor = costoMaximoReferencia(s, l.codigo, l.costoUnitario);
+      const nuevoPrecioSugerido = precioSugerido(costoMayor);
+      const ajustarPrecio = nuevoPrecioSugerido > precioAnterior;
       let detalle = '';
-      if (l.costoUnitario > precioAnterior) {
-        item.precioVenta = l.costoUnitario; item.revisionPrecio = true;
-        detalle = `${item.nombre} · ${l.marca}: costo Bs ${l.costoUnitario.toFixed(2)} mayor al precio Bs ${precioAnterior.toFixed(2)}. Precio provisional Bs ${item.precioVenta.toFixed(2)}; confirma un precio de venta en Ítems.`;
+      if (ajustarPrecio) {
+        item.precioVenta = nuevoPrecioSugerido; item.revisionPrecio = true;
+        detalle = `${item.nombre} · ${l.marca}: costo de compra Bs ${l.costoUnitario.toFixed(2)}. El costo maximo de sus marcas es Bs ${costoMayor.toFixed(2)}; precio global actualizado a Bs ${item.precioVenta.toFixed(2)} (25% sobre el mayor costo).`;
       } else if (anterior !== undefined && anterior !== l.costoUnitario) {
         detalle = `${item.nombre} · ${l.marca}: costo ${l.costoUnitario < anterior ? 'menor' : 'mayor'} (Bs ${l.costoUnitario.toFixed(2)}; anterior Bs ${anterior.toFixed(2)}). Se mantiene el precio de venta Bs ${item.precioVenta.toFixed(2)}.`;
       }
-      if (detalle) s.avisos.unshift({ id: Math.max(0, ...s.avisos.map(a => a.id)) + 1, codigo: item.codigo, detalle, prioridad: l.costoUnitario > precioAnterior ? 'alta' : 'normal', fecha: new Date().toISOString() });
+      if (detalle) s.avisos.unshift({ id: Math.max(0, ...s.avisos.map(a => a.id)) + 1, codigo: item.codigo, detalle, prioridad: ajustarPrecio ? 'alta' : 'normal', fecha: new Date().toISOString() });
       if (!item.marcas.includes(l.marca.trim())) item.marcas.push(l.marca.trim());
       s.lotes.push({ ...l, id: crypto.randomUUID(), ingresoId: b.id, fecha: b.fecha, almacen: b.almacen, disponible: l.cantidad, orden: Math.max(0, ...s.lotes.map(x => x.orden)) + 1 });
     }
