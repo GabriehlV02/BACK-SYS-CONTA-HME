@@ -7,7 +7,8 @@ type Linea = { id: string; codigo: string; marca: string; lote: string; cantidad
 type Ingreso = { id: string; fecha: string; almacen: string; proveedor: string; comprobante: string; lineas: Linea[] };
 type Lote = Linea & { ingresoId: string; fecha: string; almacen: string; disponible: number; orden: number };
 type Aviso = { id: number; codigo: string; detalle: string; prioridad: string; fecha: string };
-type Estado = { items: Item[]; ingresos: Ingreso[]; lotes: Lote[]; avisos: Aviso[]; ventas: { id: string; [key: string]: unknown }[] };
+type Opciones = { unidades: string[]; tipos: Record<string, string>; categorias: Record<string, { prefijo: string; subcategorias: string[] }>; clasificaciones: string[] };
+type Estado = { opciones?: Opciones; items: Item[]; ingresos: Ingreso[]; lotes: Lote[]; avisos: Aviso[]; ventas: { id: string; [key: string]: unknown }[] };
 const vacio = (): Estado => ({ items: [], ingresos: [], lotes: [], avisos: [], ventas: [] });
 const centavos = (n: number) => Math.round(n * 100);
 function exigir(ok: unknown, mensaje: string): asserts ok { if (!ok) throw Object.assign(new Error(mensaje), { statusCode: 400 }); }
@@ -18,9 +19,31 @@ const util = (l: Lote) => l.disponible > 0 && (!l.vence || l.vence >= hoy());
 const piso = (s: Estado, codigo: string) => Math.max(0, ...s.lotes.filter(l => l.codigo === codigo && util(l)).map(l => l.costoUnitario));
 const costoMaximoReferencia = (s: Estado, codigo: string, costoNuevo = 0) => Math.max(costoNuevo, ...s.lotes.filter(l => l.codigo === codigo).map(l => l.costoUnitario));
 const precioSugerido = (costo: number) => Math.ceil(costo * 125) / 100;
+const categorias: Record<string, string[]> = {
+  FARMACO: ['INYECTABLE', 'TABLETA', 'AMPOLLA'], INSUMO: ['DESCARTABLE', 'CURACION', 'PROTECCION PERSONAL'],
+  LABORATORIO: ['QUIMICA SANGUINEA', 'HEMATOLOGIA', 'SEROLOGIA', 'GASOMETRIA'],
+  MEDICO: ['CONSULTA GENERAL', 'CONSULTA ESPECIALIZADA', 'INTERCONSULTA'],
+  PROCEDIMIENTO: ['AMBULATORIO', 'QUIRURGICO', 'TERAPEUTICO'], IMAGENOLOGIA: ['RADIOGRAFIA', 'ECOGRAFIA', 'TOMOGRAFIA'],
+  HOSPEDAJE: ['HABITACION INDIVIDUAL', 'HABITACION COMPARTIDA', 'CUIDADOS INTENSIVOS'],
+};
+const prefijos: Record<string, string> = { FARMACO: 'FAR', INSUMO: 'INS', LABORATORIO: 'LAB', MEDICO: 'MED', PROCEDIMIENTO: 'PRO', IMAGENOLOGIA: 'IMA', HOSPEDAJE: 'HOS' };
+const siguienteNumero = (s: Estado) => Math.max(0, ...s.items.map(i => Math.max(i.id, Number(i.codigo.match(/(\d+)$/)?.[1] ?? 0)))) + 1;
+function validarExtras(b: Item, opciones: Opciones) {
+  exigir(typeof b.descripcion === 'string' && b.descripcion.length <= 1000, 'La descripción admite hasta 1.000 caracteres.');
+  exigir(['ACTIVO', 'INACTIVO'].includes(texto(b.estado).toUpperCase()), 'Estado inválido.');
+  exigir(!b.numeroSerie || (typeof b.numeroSerie === 'string' && b.numeroSerie.length <= 128), 'Código de barras demasiado largo.');
+  exigir(!b.clasificacion || opciones.clasificaciones.includes(texto(b.clasificacion)), 'Clasificación inválida.');
+  exigir(!b.imagen || (typeof b.imagen === 'string' && b.imagen.length <= 700000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(b.imagen)), 'Imagen inválida o demasiado grande.');
+}
 
 export function registrarInventario(app: FastifyInstance, archivo = resolve('data/inventario.json')) {
   let estado: Estado = existsSync(archivo) ? JSON.parse(readFileSync(archivo, 'utf8')) : vacio();
+  const opciones = (s: Estado): Opciones => s.opciones ?? {
+    unidades: ['UNITARIO', 'PAQUETE', 'VOLUMEN', 'TIEMPO'],
+    tipos: { PRODUCTO: 'PRODUCTO', INSUMO: 'INSUMO', SERVICIO: 'SERVICIO' },
+    categorias: Object.fromEntries(Object.entries(categorias).map(([nombre, subcategorias]) => [nombre, { prefijo: prefijos[nombre], subcategorias }])),
+    clasificaciones: ['SIN CLASIFICAR', 'NO APLICA', 'PENICILINAS', 'CEFALOSPORINAS', 'MACROLIDOS', 'SULFONAMIDAS', 'AINE', 'LATEX'],
+  };
   function transaccion<T>(operar: (s: Estado) => T): T {
     const copia = structuredClone(estado);
     const resultado = operar(copia);
@@ -32,9 +55,60 @@ export function registrarInventario(app: FastifyInstance, archivo = resolve('dat
   }
   const listar = () => estado.items.map(i => ({ ...i, costoMinimo: piso(estado, i.codigo), stock: estado.lotes.filter(l => l.codigo === i.codigo && util(l)).reduce((n, l) => n + l.disponible, 0) }));
   app.get('/api/inventario', async () => ({ data: listar() }));
+  app.get('/api/inventario/opciones', async () => ({ data: opciones(estado) }));
+  app.post('/api/inventario/opciones', async req => transaccion(s => {
+    const b = req.body as { campo?: string; nombre?: string; categoria?: string; prefijo?: string; base?: string };
+    exigir(b && typeof b === 'object', 'Datos inválidos.');
+    const nombre = texto(b.nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toUpperCase();
+    exigir(nombre.length >= 2 && nombre.length <= 60 && /^[A-Z0-9][A-Z0-9 /().-]*$/.test(nombre), 'Usa un nombre de 2 a 60 caracteres, sin símbolos especiales.');
+    const config = opciones(s);
+    if (b.campo === 'categorias') {
+      const prefijo = texto(b.prefijo).toUpperCase();
+      exigir(/^[A-Z]{3}$/.test(prefijo), 'El prefijo debe tener tres letras.');
+      exigir(!Object.hasOwn(config.categorias, nombre), 'La categoría ya existe.');
+      exigir(!Object.values(config.categorias).some(c => c.prefijo === prefijo), 'El prefijo ya está en uso.');
+      config.categorias[nombre] = { prefijo, subcategorias: [] };
+    } else if (b.campo === 'tipos') {
+      exigir(['PRODUCTO', 'INSUMO', 'SERVICIO'].includes(texto(b.base)), 'Selecciona el comportamiento del tipo.');
+      exigir(!Object.hasOwn(config.tipos, nombre), 'El tipo ya existe.');
+      config.tipos[nombre] = b.base!;
+    } else {
+      const lista = b.campo === 'unidades' ? config.unidades : b.campo === 'clasificaciones' ? config.clasificaciones : b.campo === 'subcategorias' && Object.hasOwn(config.categorias, texto(b.categoria)) ? config.categorias[b.categoria!].subcategorias : null;
+      exigir(lista, 'Selecciona una opción y categoría válidas.');
+      exigir(!lista.includes(nombre), 'La opción ya existe.');
+      lista.push(nombre);
+    }
+    s.opciones = config;
+    return { data: config };
+  }));
+  app.get('/api/inventario/siguiente-codigo', async () => ({ numero: siguienteNumero(estado) }));
+  app.get('/api/stock/estudios', async () => {
+    const vendidos = new Map<string, number>();
+    for (const venta of estado.ventas) {
+      if (!Array.isArray(venta.lineas)) continue;
+      for (const linea of venta.lineas) {
+        if (typeof linea?.codigo === 'string' && Number.isFinite(linea.cantidad) && linea.cantidad > 0) {
+          vendidos.set(linea.codigo, (vendidos.get(linea.codigo) ?? 0) + linea.cantidad);
+        }
+      }
+    }
+    return { data: listar().filter(item => ['PRODUCTO', 'INSUMO'].includes(item.tipo.toUpperCase())).map(item => ({
+      codigo: item.codigo, nombre: item.nombre, stock: item.stock, vendidos: vendidos.get(item.codigo) ?? 0,
+    })) };
+  });
   app.post('/api/inventario', async req => transaccion(s => {
     const b = req.body as Item;
-    exigir(b && texto(b.codigo) && texto(b.nombre) && texto(b.unidadMedida), 'Código, nombre y unidad de salida son obligatorios.');
+    exigir(b && texto(b.nombre) && texto(b.unidadMedida), 'Nombre y unidad de salida son obligatorios.');
+    const config = opciones(s);
+    validarExtras(b, config);
+    exigir(config.unidades.includes(b.unidadMedida), 'Unidad inválida.');
+    exigir(config.categorias[b.categoria]?.subcategorias.includes(b.grupo), 'Selecciona una categoría y subcategoría válidas.');
+    b.tipoOpcion = texto(b.tipoOpcion || b.tipo).toUpperCase();
+    exigir(Object.hasOwn(config.tipos, String(b.tipoOpcion)), 'Tipo inválido.');
+    b.tipo = config.tipos[String(b.tipoOpcion)];
+    const numero = siguienteNumero(s);
+    exigir(numero <= 99999, 'Se alcanzó el límite del correlativo de cinco dígitos.');
+    b.codigo = `${config.categorias[b.categoria].prefijo}${String(numero).padStart(5, '0')}`;
     exigir(['PRODUCTO', 'INSUMO', 'SERVICIO'].includes(texto(b.tipo).toUpperCase()), 'Tipo inválido.');
     exigir(Number.isFinite(b.precioVenta) && b.precioVenta >= 0, 'Precio inválido.');
     exigir(!s.items.some(i => i.codigo.toUpperCase() === b.codigo.trim().toUpperCase()), 'El código ya existe.');
@@ -46,6 +120,12 @@ export function registrarInventario(app: FastifyInstance, archivo = resolve('dat
     exigir(item, 'Ítem no encontrado.');
     const b = req.body as Item & { confirmarPrecio?: boolean };
     exigir(b && texto(b.nombre) && texto(b.unidadMedida), 'Nombre y unidad son obligatorios.');
+    const config = opciones(s);
+    validarExtras(b, config);
+    if (config.categorias[b.categoria]) exigir(config.categorias[b.categoria].subcategorias.includes(b.grupo), 'Subcategoría inválida.');
+    b.tipoOpcion = texto(b.tipoOpcion || b.tipo).toUpperCase();
+    exigir(Object.hasOwn(config.tipos, String(b.tipoOpcion)), 'Tipo inválido.');
+    b.tipo = config.tipos[String(b.tipoOpcion)];
     exigir(['PRODUCTO', 'INSUMO', 'SERVICIO'].includes(texto(b.tipo).toUpperCase()), 'Tipo inválido.');
     exigir(b.codigo === item.codigo, 'El código global no puede cambiar.');
     exigir(Number.isFinite(b.precioVenta) && centavos(b.precioVenta) >= centavos(piso(s, item.codigo)), 'El precio no puede quedar por debajo del costo de los lotes disponibles.');

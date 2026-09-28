@@ -12,6 +12,13 @@ const sessionDurationMs = 6 * 60 * 60_000;
 const sesiones = new Map<string, { limitado: boolean; vence: number }>();
 const asignacionPrueba = { sucursal: 'Hospital María Esperanza', caja: 'Caja 02 · Farmacia', almacen: 'Farmacia' };
 app.addHook('preHandler', async (request, reply) => {
+  if (request.url.split('?')[0] === '/api/inventario/opciones' && request.method === 'POST') {
+    const token = request.headers.authorization?.replace(/^Bearer /, '');
+    const sesion = token ? sesiones.get(token) : undefined;
+    if (!sesion || sesion.vence <= Date.now()) return reply.code(401).send({ message: 'Inicia sesión como administrador.' });
+    if (sesion.limitado) return reply.code(403).send({ message: 'Solo un administrador puede configurar las opciones.' });
+    return;
+  }
   if (request.url !== '/api/ventas' || request.method !== 'POST') return;
   const token = request.headers.authorization?.replace(/^Bearer /, '');
   const sesion = token ? sesiones.get(token) : undefined;
