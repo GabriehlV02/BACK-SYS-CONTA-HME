@@ -7,9 +7,10 @@ type Linea = { id: string; codigo: string; marca: string; lote: string; cantidad
 type Ingreso = { id: string; fecha: string; almacen: string; proveedor: string; comprobante: string; lineas: Linea[] };
 type Lote = Linea & { ingresoId: string; fecha: string; almacen: string; disponible: number; orden: number };
 type Aviso = { id: number; codigo: string; detalle: string; prioridad: string; fecha: string };
+type Cliente = { id: string; nombre: string; documento: string; correo: string; celular: string; direccion: string; creadoEn: string };
 type Opciones = { unidades: string[]; tipos: Record<string, string>; categorias: Record<string, { prefijo: string; subcategorias: string[] }>; clasificaciones: string[] };
-type Estado = { opciones?: Opciones; items: Item[]; ingresos: Ingreso[]; lotes: Lote[]; avisos: Aviso[]; ventas: { id: string; [key: string]: unknown }[] };
-const vacio = (): Estado => ({ items: [], ingresos: [], lotes: [], avisos: [], ventas: [] });
+type Estado = { opciones?: Opciones; items: Item[]; ingresos: Ingreso[]; lotes: Lote[]; avisos: Aviso[]; clientes: Cliente[]; ventas: { id: string; [key: string]: unknown }[] };
+const vacio = (): Estado => ({ items: [], ingresos: [], lotes: [], avisos: [], clientes: [], ventas: [] });
 const centavos = (n: number) => Math.round(n * 100);
 function exigir(ok: unknown, mensaje: string): asserts ok { if (!ok) throw Object.assign(new Error(mensaje), { statusCode: 400 }); }
 const texto = (v: unknown) => typeof v === 'string' ? v.trim() : '';
@@ -54,6 +55,17 @@ export function registrarInventario(app: FastifyInstance, archivo = resolve('dat
     return resultado;
   }
   const listar = () => estado.items.map(i => ({ ...i, costoMinimo: piso(estado, i.codigo), stock: estado.lotes.filter(l => l.codigo === i.codigo && util(l)).reduce((n, l) => n + l.disponible, 0) }));
+  app.get('/api/clientes', async () => ({ data: estado.clientes }));
+  app.post('/api/clientes', async (req, reply) => transaccion(s => {
+    const b = req.body as Partial<Cliente>;
+    const nombre = texto(b?.nombre), documento = texto(b?.documento);
+    if (!nombre || !documento) return reply.code(400).send({ message: 'Nombre y CI/NIT son obligatorios.' });
+    const existente = s.clientes.find(cliente => cliente.documento.toLowerCase() === documento.toLowerCase());
+    if (existente) return reply.code(409).send({ message: 'Este Carnet de Identidad ya está registrado con un paciente.', data: existente });
+    const cliente: Cliente = { id: crypto.randomUUID(), nombre, documento, correo: texto(b.correo), celular: texto(b.celular), direccion: texto(b.direccion), creadoEn: new Date().toISOString() };
+    s.clientes.unshift(cliente);
+    return { data: cliente };
+  }));
   app.get('/api/inventario', async () => ({ data: listar() }));
   app.get('/api/inventario/opciones', async () => ({ data: opciones(estado) }));
   app.post('/api/inventario/opciones', async req => transaccion(s => {
