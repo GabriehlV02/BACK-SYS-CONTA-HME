@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('usuarios_sistema',function(Blueprint $t):void{$t->uuid('id')->primary();$t->string('tipo_usuario',15);$t->uuid('paciente_id')->nullable()->index();$t->string('nombres',100);$t->string('apellidos',100)->nullable();$t->string('ci',25)->nullable();$t->string('correo',150)->nullable();$t->string('usuario',60)->unique();$t->string('password');$t->string('rol',60)->nullable();$t->string('estado',15)->default('ACTIVO');$t->timestamps();}); } public function down(): void {Schema::dropIfExists('usuarios_sistema');} };
