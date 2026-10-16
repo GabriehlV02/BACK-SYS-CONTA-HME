@@ -1,6 +1,7 @@
 <?php
 
 use App\Flows\Clientes\Http\ClientesController;
+use App\Flows\Autenticacion\Http\IniciarSesionController;
 use App\Flows\Usuarios\Http\RolesController;
 use App\Flows\Usuarios\Http\UsuariosController;
 use App\Flows\Ventas\Http\VentasController;
@@ -16,6 +17,8 @@ Route::post('login', function (\Illuminate\Http\Request $request) {
 
     return response()->json(['token' => Str::random(64), 'usuario' => ['nombre' => 'Administrador', 'rol' => 'Administrador', 'permisos' => []]]);
 });
+
+Route::post('login', IniciarSesionController::class);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('clientes', [ClientesController::class, 'index']);

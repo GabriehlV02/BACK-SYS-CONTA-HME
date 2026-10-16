@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class GestionAccesosSeeder extends Seeder
@@ -26,5 +27,35 @@ class GestionAccesosSeeder extends Seeder
         foreach (DB::table('sistemas')->pluck('id') as $id) DB::table('rol_sistema')->updateOrInsert(['rol_id'=>$admin,'sistema_id'=>$id]);
         foreach (DB::table('permisos')->pluck('id') as $id) DB::table('permiso_rol')->updateOrInsert(['rol_id'=>$admin,'permiso_id'=>$id]);
         $estudios = DB::table('permisos')->where('codigo','ESTUDIOS_VER_PROPIOS')->value('id'); DB::table('permiso_rol')->updateOrInsert(['rol_id'=>$paciente,'permiso_id'=>$estudios]);
+
+        $usuarioAdmin = DB::table('usuarios_sistema')->where('usuario', 'admin')->first();
+        $usuarioAdminId = $usuarioAdmin?->id ?? (string) Str::uuid();
+        DB::table('usuarios_sistema')->updateOrInsert(
+            ['usuario' => 'admin'],
+            [
+                'id' => $usuarioAdminId,
+                'tipo_usuario' => 'EMPRESA',
+                'nombres' => 'Administrador',
+                'apellidos' => 'del sistema',
+                'correo' => 'admin@hospital.local',
+                'password' => Hash::make('admin'),
+                'rol' => 'Administrador del sistema',
+                'estado' => 'ACTIVO',
+                'created_at' => $usuarioAdmin?->created_at ?? $now,
+                'updated_at' => $now,
+            ]
+        );
+        DB::table('rol_usuario')->updateOrInsert(['usuario_id' => $usuarioAdminId, 'rol_id' => $admin]);
+        foreach (DB::table('sistemas')->pluck('id') as $sistemaId) {
+            $accesoId = DB::table('usuario_sistema')->where(['usuario_id' => $usuarioAdminId, 'sistema_id' => $sistemaId])->value('id') ?? (string) Str::uuid();
+            DB::table('usuario_sistema')->updateOrInsert(
+                ['usuario_id' => $usuarioAdminId, 'sistema_id' => $sistemaId],
+                ['id' => $accesoId, 'activo' => true, 'motivo_desactivacion' => null, 'desactivado_en' => null, 'created_at' => $now, 'updated_at' => $now]
+            );
+            DB::table('rol_usuario_sistema')->updateOrInsert(
+                ['usuario_sistema_id' => $accesoId, 'rol_id' => $admin],
+                ['created_at' => $now, 'updated_at' => $now]
+            );
+        }
     }
 }
