@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Flows\Usuarios\Models\UsuarioSistema;
 use App\Models\CarritoVenta;
 use App\Models\CarritoVentaDetalle;
 use App\Models\Cliente;
+use Database\Seeders\GestionAccesosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -15,6 +17,7 @@ class VentaDirectaTest extends TestCase
 
     public function test_registro_de_cliente_para_venta_no_crea_paciente_clinico(): void
     {
+        $this->autenticarAdministrador();
         $respuesta = $this->postJson('/api/v1/clientes', [
             'nit_ci' => '9382286',
             'nombre_razon_social' => 'Cliente de mostrador',
@@ -31,6 +34,7 @@ class VentaDirectaTest extends TestCase
 
     public function test_busca_clientes_por_nombre_ci_telefono_o_correo(): void
     {
+        $this->autenticarAdministrador();
         Cliente::factory()->create([
             'nit_ci' => '9382286',
             'nombre_razon_social' => 'Cliente de mostrador',
@@ -70,6 +74,7 @@ class VentaDirectaTest extends TestCase
 
     public function test_registra_una_venta_desde_la_api_con_codigo_correlativo(): void
     {
+        $this->autenticarAdministrador();
         $cliente = Cliente::factory()->create();
 
         $respuesta = $this->postJson('/api/v1/ventas', [
@@ -101,6 +106,7 @@ class VentaDirectaTest extends TestCase
 
     public function test_lista_ventas_y_permite_filtrar_por_fechas(): void
     {
+        $this->autenticarAdministrador();
         $cliente = Cliente::factory()->create(['nombre_razon_social' => 'Cliente visible']);
         CarritoVenta::factory()->create([
             'cliente_id' => $cliente->id,
@@ -119,5 +125,11 @@ class VentaDirectaTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.codigo', 'VTA-00000001')
             ->assertJsonPath('data.0.cliente.nombre_razon_social', 'Cliente visible');
+    }
+
+    private function autenticarAdministrador(): void
+    {
+        $this->seed(GestionAccesosSeeder::class);
+        $this->actingAs(UsuarioSistema::factory()->conRol()->create(), 'contable');
     }
 }

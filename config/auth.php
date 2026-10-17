@@ -1,5 +1,6 @@
 <?php
 
+use App\Flows\Usuarios\Models\UsuarioSistema;
 use App\Models\User;
 
 return [
@@ -38,6 +39,10 @@ return [
     */
 
     'guards' => [
+        'contable' => [
+            'driver' => 'session',
+            'provider' => 'usuarios_sistema',
+        ],
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -62,6 +67,10 @@ return [
     */
 
     'providers' => [
+        'usuarios_sistema' => [
+            'driver' => 'eloquent',
+            'model' => UsuarioSistema::class,
+        ],
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
