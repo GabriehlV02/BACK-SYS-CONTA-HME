@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
             && array_intersect(['USUARIOS_VER', 'USUARIOS_CREAR', 'ROLES_GESTIONAR'], $usuario->permisosContables()) !== []);
         Gate::define('CONSULTAR_INVENTARIO', fn (UsuarioSistema $usuario): bool => $usuario->tieneAccesoContable()
             && array_intersect(['INVENTARIO_VER', 'INVENTARIO_GESTIONAR'], $usuario->permisosContables()) !== []);
-        foreach (['INVENTARIO_VER', 'INVENTARIO_GESTIONAR', 'VENTAS_VER', 'VENTAS_REGISTRAR', 'USUARIOS_VER', 'USUARIOS_CREAR', 'ROLES_GESTIONAR'] as $permiso) {
+        foreach (['MOVIMIENTOS_GESTIONAR', 'INVENTARIO_VER', 'INVENTARIO_GESTIONAR', 'VENTAS_VER', 'VENTAS_REGISTRAR', 'USUARIOS_VER', 'USUARIOS_CREAR', 'ROLES_GESTIONAR'] as $permiso) {
             Gate::define($permiso, fn (UsuarioSistema $usuario): bool => $usuario->tieneAccesoContable() && in_array($permiso, $usuario->permisosContables(), true));
         }
 

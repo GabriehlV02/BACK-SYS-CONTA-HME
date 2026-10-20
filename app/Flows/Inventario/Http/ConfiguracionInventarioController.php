@@ -23,9 +23,15 @@ class ConfiguracionInventarioController extends Controller
                 $query->with('categoria:id,nombre,activo');
             }
             if ($catalogo === 'tipos') {
-                $query->withCount('productosBase as cantidad');
+                $query->withCount(['productosBase as cantidad_productos', 'servicios as cantidad_servicios']);
             }
             $registros = $query->get();
+            if ($catalogo === 'tipos') {
+                $registros->each(function (TipoInventario $tipo): void {
+                    $tipo->setAttribute('cantidad', $tipo->cantidad_productos + $tipo->cantidad_servicios);
+                    $tipo->makeHidden(['cantidad_productos', 'cantidad_servicios']);
+                });
+            }
             $datos[$catalogo] = $registros;
         }
 

@@ -1,9 +1,13 @@
 <?php
 
 use App\Flows\Clientes\Http\ClientesController;
+use App\Flows\Inventario\Http\AdquisicionesController;
 use App\Flows\Inventario\Http\ConfiguracionInventarioController;
 use App\Flows\Inventario\Http\GuardarConfiguracionInventarioRequest;
+use App\Flows\Inventario\Http\ItemsController;
 use App\Flows\Inventario\Http\ProductosBaseController;
+use App\Flows\Inventario\Http\ServiciosController;
+use App\Flows\Inventario\Http\StockController;
 use App\Flows\Usuarios\Http\PacientesUsuariosController;
 use App\Flows\Usuarios\Http\RolesController;
 use App\Flows\Usuarios\Http\SesionController;
@@ -21,6 +25,21 @@ Route::middleware('web')->group(function (): void {
 });
 
 Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable::class])->group(function (): void {
+    Route::get('adquisiciones', [AdquisicionesController::class, 'index'])->middleware('can:MOVIMIENTOS_GESTIONAR');
+    Route::get('adquisiciones/opciones', [AdquisicionesController::class, 'opciones'])->middleware('can:MOVIMIENTOS_GESTIONAR');
+    Route::post('adquisiciones', [AdquisicionesController::class, 'store'])->middleware('can:MOVIMIENTOS_GESTIONAR');
+    Route::post('adquisiciones/almacenes', [AdquisicionesController::class, 'storeAlmacen'])->middleware('can:MOVIMIENTOS_GESTIONAR');
+    Route::get('stock/estudios', [AdquisicionesController::class, 'estudios'])->middleware('can:MOVIMIENTOS_GESTIONAR');
+    Route::get('stock/lotes', [StockController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::get('inventario/items/opciones', [ItemsController::class, 'opciones'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::get('inventario/items', [ItemsController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::post('inventario/items', [ItemsController::class, 'store'])->middleware('can:INVENTARIO_GESTIONAR');
+    Route::put('inventario/items/{item}', [ItemsController::class, 'update'])->whereNumber('item')->middleware('can:INVENTARIO_GESTIONAR');
+    Route::post('inventario/items/{item}/lotes', [ItemsController::class, 'storeLote'])->whereNumber('item')->middleware('can:INVENTARIO_GESTIONAR');
+    Route::put('inventario/items/{item}/lotes/{lote}', [ItemsController::class, 'updateLote'])->whereNumber('item')->whereNumber('lote')->scopeBindings()->middleware('can:INVENTARIO_GESTIONAR');
+    Route::get('inventario/servicios', [ServiciosController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::post('inventario/servicios', [ServiciosController::class, 'store'])->middleware('can:INVENTARIO_GESTIONAR');
+    Route::put('inventario/servicios/{servicio}', [ServiciosController::class, 'update'])->whereNumber('servicio')->middleware('can:INVENTARIO_GESTIONAR');
     Route::get('inventario/productos-base', [ProductosBaseController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
     Route::post('inventario/productos-base', [ProductosBaseController::class, 'store'])->middleware('can:INVENTARIO_GESTIONAR');
     Route::put('inventario/productos-base/{producto}', [ProductosBaseController::class, 'update'])->whereNumber('producto')->middleware('can:INVENTARIO_GESTIONAR');

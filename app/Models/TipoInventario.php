@@ -24,6 +24,11 @@ class TipoInventario extends Model
         return $this->hasMany(ProductoBase::class, 'tipo_id');
     }
 
+    public function servicios(): HasMany
+    {
+        return $this->hasMany(Servicio::class, 'tipo_id');
+    }
+
     protected function casts(): array
     {
         return ['activo' => 'boolean'];
