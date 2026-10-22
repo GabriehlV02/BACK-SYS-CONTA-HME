@@ -2,6 +2,7 @@
 
 namespace App\Flows\Usuarios\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -51,6 +52,16 @@ class RegistrarUsuarioRequest extends FormRequest
                 return;
             }
             $almacenes = $this->input('almacen_ids', []);
+            $permitidos = app(AccesoAlmacenes::class)->ids();
+            if ($permitidos !== null) {
+                if (array_diff(array_map('intval', $almacenes), $permitidos) !== []) {
+                    $validator->errors()->add('almacen_ids', 'Solo puedes asignar tus almacenes autorizados.');
+                }
+                $sucursales = DB::table('almacenes_inventario')->whereIn('id', $permitidos)->pluck('sucursal_id')->all();
+                if (array_diff(array_map('intval', $this->input('sucursal_ids', [])), $sucursales) !== []) {
+                    $validator->errors()->add('sucursal_ids', 'Solo puedes asignar sucursales de tus almacenes autorizados.');
+                }
+            }
             if ($almacenes !== [] && DB::table('almacenes_inventario')->whereIn('id', $almacenes)
                 ->whereNotIn('sucursal_id', $this->input('sucursal_ids', []))->exists()) {
                 $validator->errors()->add('almacen_ids', 'Selecciona almacenes de las sucursales asignadas al usuario.');

@@ -15,6 +15,7 @@ class RegistrarIngreso
     public function handle(array $datos, string $usuarioId): IngresoStock
     {
         return DB::transaction(function () use ($datos, $usuarioId): IngresoStock {
+            app(AccesoAlmacenes::class)->exigir((int) $datos['almacen_id']);
             $almacen = AlmacenInventario::with('sucursal')->lockForUpdate()->findOrFail($datos['almacen_id']);
             $huella = hash('sha256', json_encode($datos, JSON_THROW_ON_ERROR));
             $ingreso = IngresoStock::query()->createOrFirst(['solicitud_id' => $datos['solicitud_id']], [
@@ -33,6 +34,12 @@ class RegistrarIngreso
             }
             $items = ItemInventario::with(['productoBase.tipo', 'productoBase.categoria', 'unidad'])
                 ->whereIn('id', array_column($datos['lineas'], 'item_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $acceso = app(AccesoAlmacenes::class);
+            $permitidos = $acceso->ids();
+            if ($permitidos !== null) {
+                $visibles = $acceso->items(ItemInventario::query())->whereIn('id', $items->keys())->pluck('id')->all();
+                abort_unless(count($visibles) === $items->count(), 403, 'Hay productos fuera de tus almacenes asignados.');
+            }
             $totalCentavos = 0;
             $lotesUsados = [];
             foreach ($datos['lineas'] as $indice => $linea) {
@@ -50,6 +57,9 @@ class RegistrarIngreso
                     throw ValidationException::withMessages(["lineas.$indice.lote" => 'Indica el número de lote.']);
                 }
                 $lote = $item->lotes()->where('clave', Str::upper(Str::ascii($numero)))->lockForUpdate()->first();
+                if ($lote && $permitidos !== null) {
+                    abort_unless($lote->existencias()->whereIn('almacen_id', $permitidos)->exists(), 403, 'Ese lote no pertenece a tus almacenes.');
+                }
                 $vence = $linea['vence'] ?? null;
                 if ($lote && $lote->vencimiento?->format('Y-m-d') !== $vence) {
                     throw ValidationException::withMessages(["lineas.$indice.vence" => 'El vencimiento debe coincidir con el lote ya registrado.']);
@@ -58,6 +68,11 @@ class RegistrarIngreso
                 if (! $lote) {
                     $lote = $item->lotes()->create(['numero' => $numero, 'clave' => Str::upper(Str::ascii($numero)), 'vencimiento' => $vence, ...$precios]);
                 } else {
+                    if ($permitidos !== null && $lote->existencias()->whereNotIn('almacen_id', $permitidos)->exists()) {
+                        foreach ($precios as $campo => $valor) {
+                            abort_unless((string) $lote->$campo === number_format((float) $valor, 2, '.', ''), 403, 'Solo el administrador puede cambiar los precios de un lote compartido con otros almacenes.');
+                        }
+                    }
                     $lote->update($precios);
                 }
                 if (in_array($lote->id, $lotesUsados, true)) {

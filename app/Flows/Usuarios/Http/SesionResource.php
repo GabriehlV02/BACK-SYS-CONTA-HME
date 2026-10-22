@@ -18,6 +18,7 @@ class SesionResource extends JsonResource
             'nombre' => trim($this->nombres.' '.$this->apellidos),
             'rol' => $this->rolesContables()->orderBy('roles.nombre')->pluck('roles.nombre')->implode(', '),
             'permisos' => $this->permisosContables(),
+            'administra_catalogo' => $this->can('ADMINISTRAR_CATALOGO'),
         ];
     }
 }

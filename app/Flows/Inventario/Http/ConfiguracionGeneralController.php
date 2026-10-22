@@ -2,10 +2,12 @@
 
 namespace App\Flows\Inventario\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use App\Http\Controllers\Controller;
 use App\Models\AlmacenInventario;
 use App\Models\Dispositivo;
 use App\Models\SucursalInventario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,10 +17,14 @@ class ConfiguracionGeneralController extends Controller
 {
     public function index(): JsonResponse
     {
+        $acceso = app(AccesoAlmacenes::class);
+        $ids = $acceso->ids();
+        $sucursalIds = $acceso->almacenes(AlmacenInventario::query())->select('sucursal_id');
+
         return response()->json(['data' => [
-            'sucursales' => SucursalInventario::withCount('almacenes')->orderBy('id')->get()->map(fn (SucursalInventario $s): array => $this->sucursal($s)),
-            'almacenes' => AlmacenInventario::orderBy('id')->get()->map(fn (AlmacenInventario $a): array => $this->almacen($a)),
-            'dispositivos' => Dispositivo::with('usuario')->orderBy('id')->get()->map(fn (Dispositivo $d): array => $this->dispositivo($d)),
+            'sucursales' => $acceso->sucursales(SucursalInventario::query())->withCount(['almacenes' => fn (Builder $q) => $acceso->almacenes($q)])->orderBy('id')->get()->map(fn (SucursalInventario $s): array => $this->sucursal($s)),
+            'almacenes' => $acceso->almacenes(AlmacenInventario::query())->orderBy('id')->get()->map(fn (AlmacenInventario $a): array => $this->almacen($a)),
+            'dispositivos' => Dispositivo::with('usuario')->when($ids !== null, fn (Builder $q) => $q->whereIn('sucursal_id', $sucursalIds)->where('usuario_id', auth('contable')->id()))->orderBy('id')->get()->map(fn (Dispositivo $d): array => $this->dispositivo($d)),
         ]]);
     }
 

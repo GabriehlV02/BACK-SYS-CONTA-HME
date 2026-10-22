@@ -2,6 +2,7 @@
 
 namespace App\Flows\Inventario\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use App\Http\Controllers\Controller;
 use App\Models\ProductoBase;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +24,7 @@ class ProductosBaseController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
             'por_pagina' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $query = ProductoBase::query()->with(self::RELACIONES);
+        $query = app(AccesoAlmacenes::class)->grupos(ProductoBase::query()->with(self::RELACIONES));
         if (! empty($datos['buscar'])) {
             $buscar = $datos['buscar'];
             $query->where(function (Builder $query) use ($buscar): void {

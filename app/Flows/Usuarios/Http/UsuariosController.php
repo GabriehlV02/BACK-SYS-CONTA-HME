@@ -2,6 +2,7 @@
 
 namespace App\Flows\Usuarios\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use App\Flows\Usuarios\Models\UsuarioSistema;
 use App\Models\AlmacenInventario;
 use App\Models\SucursalInventario;
@@ -86,9 +87,11 @@ class UsuariosController
 
     public function opciones(): JsonResponse
     {
+        $acceso = app(AccesoAlmacenes::class);
+
         return response()->json(['data' => [
-            'sucursales' => SucursalInventario::where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'codigo']),
-            'almacenes' => AlmacenInventario::where('activo', true)->whereHas('sucursal', fn (Builder $q) => $q->where('activo', true))
+            'sucursales' => $acceso->sucursales(SucursalInventario::query())->where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'codigo']),
+            'almacenes' => $acceso->almacenes(AlmacenInventario::query())->where('activo', true)->whereHas('sucursal', fn (Builder $q) => $q->where('activo', true))
                 ->orderBy('nombre')->get(['id', 'nombre', 'codigo', 'sucursal_id']),
         ]]);
     }

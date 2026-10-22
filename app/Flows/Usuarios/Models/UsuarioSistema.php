@@ -53,6 +53,10 @@ class UsuarioSistema extends Authenticatable
 
         $propios = DB::table('permiso_rol')->whereIn('rol_id', $this->rolesContables()->select('roles.id'))->select('permiso_id');
 
+        if (DB::table('roles')->where('id', $rolId)->where('codigo', 'ADMINISTRADOR')->exists()) {
+            return false;
+        }
+
         return ! DB::table('permiso_rol')->where('rol_id', $rolId)->whereNotIn('permiso_id', $propios)->exists();
     }
 

@@ -2,12 +2,14 @@
 
 namespace App\Flows\Inventario\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use App\Http\Controllers\Controller;
 use App\Models\CategoriaInventario;
 use App\Models\ClasificacionInventario;
 use App\Models\SubcategoriaInventario;
 use App\Models\TipoInventario;
 use App\Models\UnidadInventario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +25,7 @@ class ConfiguracionInventarioController extends Controller
                 $query->with('categoria:id,nombre,activo');
             }
             if ($catalogo === 'tipos') {
-                $query->withCount(['productosBase as cantidad_productos', 'servicios as cantidad_servicios']);
+                $query->withCount(['productosBase as cantidad_productos' => fn (Builder $q) => app(AccesoAlmacenes::class)->grupos($q), 'servicios as cantidad_servicios']);
             }
             $registros = $query->get();
             if ($catalogo === 'tipos') {

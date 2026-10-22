@@ -2,6 +2,7 @@
 
 namespace App\Flows\Inventario\Http;
 
+use App\Flows\Inventario\AccesoAlmacenes;
 use App\Flows\Inventario\RegistrarIngreso;
 use App\Http\Controllers\Controller;
 use App\Models\AlmacenInventario;
@@ -17,17 +18,21 @@ use Illuminate\Validation\Rule;
 
 class AdquisicionesController extends Controller
 {
+    public function __construct(private AccesoAlmacenes $acceso) {}
+
     public function index(): JsonResponse
     {
-        return response()->json(['data' => IngresoStock::with('detalles')->orderByDesc('fecha')->orderByDesc('id')->get()->map(fn (IngresoStock $ingreso): array => $ingreso->datos())]);
+        $ids = $this->acceso->ids();
+
+        return response()->json(['data' => IngresoStock::with('detalles')->when($ids !== null, fn (Builder $q) => $q->whereIn('almacen_id', $ids))->orderByDesc('fecha')->orderByDesc('id')->get()->map(fn (IngresoStock $ingreso): array => $ingreso->datos())]);
     }
 
     public function opciones(): JsonResponse
     {
         return response()->json(['data' => [
-            'almacenes' => AlmacenInventario::with('sucursal')->where('activo', true)->whereHas('sucursal', fn (Builder $q) => $q->where('activo', true))->orderBy('nombre')->orderBy('id')->get(),
-            'sucursales' => SucursalInventario::where('activo', true)->orderBy('nombre')->get(),
-            'items' => ItemInventario::with(['productoBase.categoria', 'unidad', 'lotes'])->where('estado', 'ACTIVO')
+            'almacenes' => $this->acceso->almacenes(AlmacenInventario::with('sucursal'))->where('activo', true)->whereHas('sucursal', fn (Builder $q) => $q->where('activo', true))->orderBy('nombre')->orderBy('id')->get(),
+            'sucursales' => $this->acceso->sucursales(SucursalInventario::query())->where('activo', true)->orderBy('nombre')->get(),
+            'items' => $this->acceso->items(ItemInventario::with(['productoBase.categoria', 'unidad', 'lotes']))->with(['lotes' => fn ($q) => $this->acceso->lotes($q->getQuery())])->where('estado', 'ACTIVO')
                 ->whereHas('unidad', fn (Builder $q) => $q->where('activo', true))
                 ->whereHas('productoBase', fn (Builder $q) => $q->where('estado', 'ACTIVO')->whereHas('tipo', fn (Builder $t) => $t->where('activo', true)->whereIn('tipo_base', ['PRODUCTO', 'INSUMO'])))
                 ->orderBy('nombre_comercial')->orderBy('id')->get()->map(fn (ItemInventario $item): array => [
@@ -42,6 +47,7 @@ class AdquisicionesController extends Controller
 
     public function store(GuardarIngresoRequest $request, RegistrarIngreso $registrar): JsonResponse
     {
+        $this->acceso->exigir((int) $request->validated('almacen_id'));
         $ingreso = $registrar->handle($request->validated(), $request->user('contable')->getKey());
 
         return response()->json(['data' => $ingreso->datos()], $ingreso->wasRecentlyCreated ? 201 : 200);
@@ -49,6 +55,7 @@ class AdquisicionesController extends Controller
 
     public function storeAlmacen(Request $request): JsonResponse
     {
+        $this->acceso->exigirCatalogoCentral();
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:150'], 'codigo' => ['required', 'string', 'max:30', Rule::unique('almacenes_inventario')],
             'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales_inventario', 'id')->where('activo', true)],
@@ -65,10 +72,11 @@ class AdquisicionesController extends Controller
 
     public function estudios(): JsonResponse
     {
-        $stock = DB::table('existencias_lote')->join('lotes_items', 'lotes_items.id', '=', 'existencias_lote.lote_id')
+        $ids = $this->acceso->ids();
+        $stock = DB::table('existencias_lote')->when($ids !== null, fn ($q) => $q->whereIn('almacen_id', $ids))->join('lotes_items', 'lotes_items.id', '=', 'existencias_lote.lote_id')
             ->selectRaw('lotes_items.item_id, SUM(existencias_lote.cantidad) as cantidad')->groupBy('lotes_items.item_id')->pluck('cantidad', 'item_id');
 
-        return response()->json(['data' => ItemInventario::orderBy('id')->get()->map(fn (ItemInventario $item): array => [
+        return response()->json(['data' => $this->acceso->items(ItemInventario::query())->orderBy('id')->get()->map(fn (ItemInventario $item): array => [
             'codigo' => $item->codigo, 'nombre' => $item->nombre_comercial,
             'stock' => (float) ($stock[$item->id] ?? 0),
         ]), 'meta' => ['ventas_conectadas' => false]]);
