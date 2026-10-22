@@ -15,11 +15,11 @@ class AlmacenInventario extends Model
 
     protected $table = 'almacenes_inventario';
 
-    protected $fillable = ['nombre', 'codigo', 'sucursal_id', 'activo'];
+    protected $fillable = ['nombre', 'codigo', 'sucursal_id', 'tipos_item', 'activo'];
 
     protected function casts(): array
     {
-        return ['activo' => 'boolean'];
+        return ['activo' => 'boolean', 'tipos_item' => 'array'];
     }
 
     public function sucursal(): BelongsTo

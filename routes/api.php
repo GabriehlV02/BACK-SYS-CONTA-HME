@@ -2,6 +2,7 @@
 
 use App\Flows\Clientes\Http\ClientesController;
 use App\Flows\Inventario\Http\AdquisicionesController;
+use App\Flows\Inventario\Http\ConfiguracionGeneralController;
 use App\Flows\Inventario\Http\ConfiguracionInventarioController;
 use App\Flows\Inventario\Http\GuardarConfiguracionInventarioRequest;
 use App\Flows\Inventario\Http\ItemsController;
@@ -25,6 +26,10 @@ Route::middleware('web')->group(function (): void {
 });
 
 Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable::class])->group(function (): void {
+    Route::get('configuracion/general', [ConfiguracionGeneralController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::post('configuracion/sucursales', [ConfiguracionGeneralController::class, 'storeSucursal'])->middleware('can:INVENTARIO_GESTIONAR');
+    Route::post('configuracion/almacenes', [ConfiguracionGeneralController::class, 'storeAlmacen'])->middleware('can:INVENTARIO_GESTIONAR');
+    Route::post('configuracion/dispositivos', [ConfiguracionGeneralController::class, 'storeDispositivo'])->middleware('can:INVENTARIO_GESTIONAR');
     Route::get('adquisiciones', [AdquisicionesController::class, 'index'])->middleware('can:MOVIMIENTOS_GESTIONAR');
     Route::get('adquisiciones/opciones', [AdquisicionesController::class, 'opciones'])->middleware('can:MOVIMIENTOS_GESTIONAR');
     Route::post('adquisiciones', [AdquisicionesController::class, 'store'])->middleware('can:MOVIMIENTOS_GESTIONAR');
@@ -54,6 +59,7 @@ Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable
     Route::get('ventas', [VentasController::class, 'index'])->middleware('can:VENTAS_VER');
     Route::post('ventas', [VentasController::class, 'store'])->middleware('can:VENTAS_REGISTRAR');
     Route::get('usuarios', [UsuariosController::class, 'index'])->middleware('can:USUARIOS_VER');
+    Route::get('usuarios/opciones', [UsuariosController::class, 'opciones'])->middleware('can:USUARIOS_VER');
     Route::post('usuarios', [UsuariosController::class, 'store'])->middleware('can:USUARIOS_CREAR');
     Route::get('pacientes-usuarios', [PacientesUsuariosController::class, 'index'])->middleware('can:USUARIOS_VER');
     Route::post('pacientes-usuarios', [PacientesUsuariosController::class, 'store'])->middleware('can:USUARIOS_CREAR');

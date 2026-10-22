@@ -70,6 +70,18 @@ class AdquisicionesTest extends TestCase
         $this->getJson('/api/v1/stock/lotes')->assertOk()->assertJsonPath('data.0.disponible', 2.5)->assertJsonPath('data.0.precio3', '13.75');
     }
 
+    public function test_rechaza_tipo_de_item_no_permitido_por_el_almacen_sin_crear_stock(): void
+    {
+        $this->administrador();
+        $datos = $this->datos();
+        $tipo = ItemInventario::findOrFail($datos['lineas'][0]['item_id'])->productoBase->tipo->tipo_base;
+        AlmacenInventario::findOrFail($datos['almacen_id'])->update(['tipos_item' => [$tipo === 'PRODUCTO' ? 'Insumos' : 'Productos']]);
+        $this->postJson('/api/v1/adquisiciones', $datos)->assertUnprocessable()->assertJsonValidationErrors('lineas.0.item_id');
+        $this->assertDatabaseCount('ingresos_stock', 0);
+        $this->assertDatabaseCount('existencias_lote', 0);
+        $this->assertDatabaseCount('lotes_items', 0);
+    }
+
     public function test_reintento_identico_no_duplica_stock_y_cambio_de_payload_da_409(): void
     {
         $this->administrador();
@@ -110,7 +122,7 @@ class AdquisicionesTest extends TestCase
         $datos['almacen_id'] = AlmacenInventario::factory()->create()->id;
         $this->postJson('/api/v1/adquisiciones', $datos)->assertCreated();
         $this->assertDatabaseCount('existencias_lote', 2);
-        $this->assertSame('5.000', DB::table('existencias_lote')->sum('cantidad'));
+        $this->assertSame(5.0, (float) DB::table('existencias_lote')->sum('cantidad'));
     }
 
     public function test_revierte_todo_si_una_linea_posterior_es_invalida(): void

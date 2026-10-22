@@ -2,9 +2,12 @@
 
 namespace App\Flows\Usuarios\Models;
 
+use App\Models\AlmacenInventario;
+use App\Models\SucursalInventario;
 use Database\Factories\UsuarioSistemaFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +24,16 @@ class UsuarioSistema extends Authenticatable
     protected $fillable = ['tipo_usuario', 'paciente_id', 'nombres', 'apellidos', 'ci', 'correo', 'usuario', 'password', 'rol', 'estado', 'sucursal', 'cajas', 'almacenes'];
 
     protected $rememberTokenName = null;
+
+    public function sucursalesAsignadas(): BelongsToMany
+    {
+        return $this->belongsToMany(SucursalInventario::class, 'sucursal_usuario', 'usuario_id', 'sucursal_id');
+    }
+
+    public function almacenesAsignados(): BelongsToMany
+    {
+        return $this->belongsToMany(AlmacenInventario::class, 'almacen_usuario', 'usuario_id', 'almacen_id');
+    }
 
     protected static function newFactory(): UsuarioSistemaFactory
     {

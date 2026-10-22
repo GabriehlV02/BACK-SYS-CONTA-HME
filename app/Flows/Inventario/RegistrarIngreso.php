@@ -42,6 +42,10 @@ class RegistrarIngreso
                     throw ValidationException::withMessages(["lineas.$indice.item_id" => 'Selecciona un ítem activo con agrupador, tipo y unidad activos.']);
                 }
                 $numero = Str::squish($linea['lote']);
+                $tipoPermitido = $item->productoBase->tipo->tipo_base === 'PRODUCTO' ? 'Productos' : 'Insumos';
+                if (! in_array($tipoPermitido, $almacen->tipos_item, true)) {
+                    throw ValidationException::withMessages(["lineas.$indice.item_id" => 'El almacén seleccionado no permite este tipo de ítem.']);
+                }
                 if ($numero === '') {
                     throw ValidationException::withMessages(["lineas.$indice.lote" => 'Indica el número de lote.']);
                 }

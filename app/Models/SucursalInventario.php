@@ -14,7 +14,7 @@ class SucursalInventario extends Model
 
     protected $table = 'sucursales_inventario';
 
-    protected $fillable = ['nombre', 'codigo', 'activo'];
+    protected $fillable = ['nombre', 'codigo', 'direccion', 'activo'];
 
     protected function casts(): array
     {

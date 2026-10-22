@@ -3,6 +3,8 @@
 namespace App\Flows\Usuarios\Http;
 
 use App\Flows\Usuarios\Models\UsuarioSistema;
+use App\Models\AlmacenInventario;
+use App\Models\SucursalInventario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ class UsuariosController
             'tipo_usuario' => ['sometimes', 'in:EMPRESA,PACIENTE'], 'estado' => ['sometimes', 'in:ACTIVO,INACTIVO'],
             'buscar' => ['sometimes', 'nullable', 'string', 'max:100'], 'por_pagina' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
-        $query = UsuarioSistema::query()->where('tipo_usuario', $datos['tipo_usuario'] ?? 'EMPRESA');
+        $query = UsuarioSistema::with(['sucursalesAsignadas', 'almacenesAsignados'])->where('tipo_usuario', $datos['tipo_usuario'] ?? 'EMPRESA');
         if (isset($datos['estado'])) {
             $query->where('estado', $datos['estado']);
         }
@@ -46,7 +48,8 @@ class UsuariosController
     {
         $datos = $request->validated();
         $usuario = DB::transaction(function () use ($datos): UsuarioSistema {
-            $usuario = UsuarioSistema::create([...Arr::except($datos, ['rol_id', 'password_confirmation']), 'estado' => $datos['estado'] ?? 'ACTIVO']);
+            $usuario = UsuarioSistema::create([...Arr::except($datos, ['rol_id', 'password_confirmation', 'sucursal_ids', 'almacen_ids']), 'estado' => $datos['estado'] ?? 'ACTIVO']);
+            $this->asignarUbicaciones($usuario, $datos);
             if (! empty($datos['rol_id'])) {
                 $this->asignarRol($usuario, $datos['rol_id']);
             }
@@ -54,7 +57,7 @@ class UsuariosController
             return $usuario;
         });
 
-        return response()->json(['data' => $usuario], 201);
+        return response()->json(['data' => $usuario->load(['sucursalesAsignadas', 'almacenesAsignados'])], 201);
     }
 
     public function update(ActualizarUsuarioRequest $request, string $usuario): JsonResponse
@@ -69,15 +72,37 @@ class UsuariosController
             throw ValidationException::withMessages(['estado' => 'No puedes desactivar tu propia sesión.']);
         }
         DB::transaction(function () use ($registro, $datos): void {
-            $atributos = Arr::except($datos, ['rol_id', 'password_confirmation']);
+            $atributos = Arr::except($datos, ['rol_id', 'password_confirmation', 'sucursal_ids', 'almacen_ids']);
             if (empty($atributos['password'])) {
                 unset($atributos['password']);
             }
             $registro->update($atributos);
+            $this->asignarUbicaciones($registro, $datos);
             $this->asignarRol($registro, $datos['rol_id']);
         });
 
-        return response()->json(['data' => $registro->fresh()]);
+        return response()->json(['data' => $registro->fresh(['sucursalesAsignadas', 'almacenesAsignados'])]);
+    }
+
+    public function opciones(): JsonResponse
+    {
+        return response()->json(['data' => [
+            'sucursales' => SucursalInventario::where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'codigo']),
+            'almacenes' => AlmacenInventario::where('activo', true)->whereHas('sucursal', fn (Builder $q) => $q->where('activo', true))
+                ->orderBy('nombre')->get(['id', 'nombre', 'codigo', 'sucursal_id']),
+        ]]);
+    }
+
+    private function asignarUbicaciones(UsuarioSistema $usuario, array $datos): void
+    {
+        if (array_key_exists('sucursal_ids', $datos)) {
+            $usuario->sucursalesAsignadas()->sync($datos['sucursal_ids']);
+            $usuario->almacenesAsignados()->sync($datos['almacen_ids'] ?? []);
+            $usuario->update([
+                'sucursal' => $usuario->sucursalesAsignadas()->orderBy('sucursales_inventario.id')->value('nombre'),
+                'almacenes' => $usuario->almacenesAsignados()->orderBy('almacenes_inventario.id')->pluck('nombre')->all(),
+            ]);
+        }
     }
 
     private function asignarRol(UsuarioSistema $usuario, string $rol): void

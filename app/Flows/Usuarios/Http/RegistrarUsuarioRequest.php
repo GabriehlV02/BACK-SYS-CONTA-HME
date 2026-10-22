@@ -3,6 +3,7 @@
 namespace App\Flows\Usuarios\Http;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -36,12 +37,25 @@ class RegistrarUsuarioRequest extends FormRequest
             'cajas.*' => ['required', 'string', 'max:100', 'distinct'],
             'almacenes' => ['sometimes', 'array', 'max:100'],
             'almacenes.*' => ['required', 'string', 'max:100', 'distinct'],
+            'sucursal_ids' => ['sometimes', 'array', 'max:100'],
+            'sucursal_ids.*' => ['required', 'integer', 'distinct', Rule::exists('sucursales_inventario', 'id')->where('activo', true)],
+            'almacen_ids' => ['sometimes', 'array', 'max:100'],
+            'almacen_ids.*' => ['required', 'integer', 'distinct', Rule::exists('almacenes_inventario', 'id')->where('activo', true)],
         ];
     }
 
     public function after(): array
     {
         return [function (Validator $validator): void {
+            if (! $validator->errors()->isEmpty()) {
+                return;
+            }
+            $almacenes = $this->input('almacen_ids', []);
+            if ($almacenes !== [] && DB::table('almacenes_inventario')->whereIn('id', $almacenes)
+                ->whereNotIn('sucursal_id', $this->input('sucursal_ids', []))->exists()) {
+                $validator->errors()->add('almacen_ids', 'Selecciona almacenes de las sucursales asignadas al usuario.');
+            }
+        }, function (Validator $validator): void {
             if ($validator->errors()->has('rol_id') || ! $this->filled('rol_id')) {
                 return;
             }
