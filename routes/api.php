@@ -2,6 +2,7 @@
 
 use App\Flows\Clientes\Http\ClientesController;
 use App\Flows\Inventario\Http\AdquisicionesController;
+use App\Flows\Inventario\Http\CajasController;
 use App\Flows\Inventario\Http\ConfiguracionGeneralController;
 use App\Flows\Inventario\Http\ConfiguracionInventarioController;
 use App\Flows\Inventario\Http\GuardarConfiguracionInventarioRequest;
@@ -27,6 +28,8 @@ Route::middleware('web')->group(function (): void {
 });
 
 Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable::class])->group(function (): void {
+    Route::get('configuracion/cajas', [CajasController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::post('configuracion/cajas', [CajasController::class, 'store'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::get('configuracion/general', [ConfiguracionGeneralController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
     Route::post('configuracion/sucursales', [ConfiguracionGeneralController::class, 'storeSucursal'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::post('configuracion/almacenes', [ConfiguracionGeneralController::class, 'storeAlmacen'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);

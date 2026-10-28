@@ -25,4 +25,9 @@ class SucursalInventario extends Model
     {
         return $this->hasMany(AlmacenInventario::class, 'sucursal_id');
     }
+
+    public function cajas(): HasMany
+    {
+        return $this->hasMany(Caja::class, 'sucursal_id');
+    }
 }

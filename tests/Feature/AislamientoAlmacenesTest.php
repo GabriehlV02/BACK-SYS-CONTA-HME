@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Flows\Usuarios\Models\UsuarioSistema;
 use App\Models\AlmacenInventario;
+use App\Models\Caja;
 use App\Models\ExistenciaLote;
 use App\Models\IngresoStock;
 use App\Models\LoteItem;
@@ -16,6 +17,21 @@ use Tests\TestCase;
 class AislamientoAlmacenesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_cajas_solo_expone_almacenes_autorizados_y_no_permite_registrar_al_operador(): void
+    {
+        $compartida = Caja::factory()->create(['sucursal_id' => $this->propio->sucursal_id]);
+        $compartida->almacenes()->attach([$this->propio->id, $this->ajeno->id]);
+        $ajena = Caja::factory()->create(['sucursal_id' => $this->ajeno->sucursal_id]);
+        $ajena->almacenes()->attach($this->ajeno->id);
+        $this->getJson('/api/v1/configuracion/cajas')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $compartida->id)->assertJsonPath('data.0.almacenIds', [$this->propio->id]);
+        $this->postJson('/api/v1/configuracion/cajas', [])->assertForbidden();
+        $this->getJson('/api/v1/usuarios/opciones')->assertOk()->assertJsonCount(1, 'data.cajas')
+            ->assertJsonPath('data.cajas.0.id', $compartida->id)->assertJsonPath('data.cajas.0.almacen_ids', [$this->propio->id]);
+        $this->usuario->almacenesAsignados()->detach();
+        $this->getJson('/api/v1/configuracion/cajas')->assertOk()->assertJsonPath('data', []);
+    }
 
     private UsuarioSistema $usuario;
 

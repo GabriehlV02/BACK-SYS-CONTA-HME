@@ -6,6 +6,7 @@ use Database\Factories\AlmacenInventarioFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AlmacenInventario extends Model
@@ -30,5 +31,10 @@ class AlmacenInventario extends Model
     public function existencias(): HasMany
     {
         return $this->hasMany(ExistenciaLote::class, 'almacen_id');
+    }
+
+    public function cajas(): BelongsToMany
+    {
+        return $this->belongsToMany(Caja::class, 'almacen_caja', 'almacen_id', 'caja_id');
     }
 }

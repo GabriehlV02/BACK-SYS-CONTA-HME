@@ -3,6 +3,7 @@
 namespace App\Flows\Usuarios\Models;
 
 use App\Models\AlmacenInventario;
+use App\Models\Caja;
 use App\Models\SucursalInventario;
 use Database\Factories\UsuarioSistemaFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -28,6 +29,11 @@ class UsuarioSistema extends Authenticatable
     public function sucursalesAsignadas(): BelongsToMany
     {
         return $this->belongsToMany(SucursalInventario::class, 'sucursal_usuario', 'usuario_id', 'sucursal_id');
+    }
+
+    public function cajasAsignadas(): BelongsToMany
+    {
+        return $this->belongsToMany(Caja::class, 'caja_usuario', 'usuario_id', 'caja_id');
     }
 
     public function almacenesAsignados(): BelongsToMany

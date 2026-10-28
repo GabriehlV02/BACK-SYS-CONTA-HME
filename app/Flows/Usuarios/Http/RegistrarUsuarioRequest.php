@@ -3,6 +3,8 @@
 namespace App\Flows\Usuarios\Http;
 
 use App\Flows\Inventario\AccesoAlmacenes;
+use App\Flows\Usuarios\Models\UsuarioSistema;
+use App\Models\Caja;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -36,6 +38,8 @@ class RegistrarUsuarioRequest extends FormRequest
             'sucursal' => ['nullable', 'string', 'max:150'],
             'cajas' => ['sometimes', 'array', 'max:100'],
             'cajas.*' => ['required', 'string', 'max:100', 'distinct'],
+            'caja_ids' => ['sometimes', 'array', 'max:100'],
+            'caja_ids.*' => ['required', 'integer', 'distinct', Rule::exists('cajas', 'id')->where('activo', true)],
             'almacenes' => ['sometimes', 'array', 'max:100'],
             'almacenes.*' => ['required', 'string', 'max:100', 'distinct'],
             'sucursal_ids' => ['sometimes', 'array', 'max:100'],
@@ -52,6 +56,15 @@ class RegistrarUsuarioRequest extends FormRequest
                 return;
             }
             $almacenes = $this->input('almacen_ids', []);
+            if ($this->has('caja_ids') || $this->has('sucursal_ids') || $this->has('almacen_ids')) {
+                $registro = $this->route('usuario') ? UsuarioSistema::find($this->route('usuario')) : null;
+                $cajas = $this->input('caja_ids', $registro?->cajasAsignadas()->pluck('cajas.id')->all() ?? []);
+                $validas = Caja::where('activo', true)->whereIn('sucursal_id', $this->input('sucursal_ids', []))
+                    ->whereHas('almacenes', fn ($q) => $q->whereIn('almacenes_inventario.id', $almacenes)->where('activo', true))->pluck('id')->all();
+                if (array_diff($cajas, $validas)) {
+                    $validator->errors()->add('caja_ids', 'Selecciona cajas activas de las sucursales y almacenes asignados.');
+                }
+            }
             $permitidos = app(AccesoAlmacenes::class)->ids();
             if ($permitidos !== null) {
                 if (array_diff(array_map('intval', $almacenes), $permitidos) !== []) {
