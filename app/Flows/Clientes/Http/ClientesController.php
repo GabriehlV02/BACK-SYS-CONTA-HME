@@ -2,6 +2,7 @@
 
 namespace App\Flows\Clientes\Http;
 
+use App\Flows\Clientes\PacientesClinicos;
 use App\Models\Cliente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,13 +29,20 @@ class ClientesController
             })
             ->orderBy('nombre_razon_social')
             ->limit(20)
-            ->get(['id', 'nit_ci', 'nombre_razon_social', 'telefono', 'correo']);
+            ->get(['id', 'paciente_id', 'nit_ci', 'nombre_razon_social', 'telefono', 'correo']);
 
         return response()->json(['data' => $clientes]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, PacientesClinicos $clinico): JsonResponse
     {
+        if ($request->filled('paciente_id')) {
+            $datosVinculo = $request->validate(['paciente_id' => ['required', 'uuid']]);
+            $paciente = $clinico->consultar($datosVinculo['paciente_id']);
+            $cliente = $clinico->vincular($paciente);
+
+            return response()->json(['data' => $cliente->only(['id', 'paciente_id', 'nit_ci', 'nombre_razon_social', 'telefono', 'correo'])], 201);
+        }
         $datos = $request->validate([
             'nit_ci' => ['nullable', 'string', 'max:30', Rule::unique('clientes', 'nit_ci')],
             'nombre_razon_social' => ['required', 'string', 'max:180'],

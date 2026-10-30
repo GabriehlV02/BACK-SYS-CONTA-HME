@@ -19,7 +19,7 @@ class VentasController
 
         $ventas = CarritoVenta::query()
             ->with([
-                'cliente:id,nit_ci,nombre_razon_social,telefono,correo',
+                'cliente:id,paciente_id,nit_ci,nombre_razon_social,telefono,correo',
                 'detalles:id,carrito_venta_id,codigo_item,nombre_item,tipo_item,cantidad,precio_unitario,descuento,total',
             ])
             ->where('estado', 'COMPLETADA')

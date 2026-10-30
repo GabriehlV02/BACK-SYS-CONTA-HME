@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'clinico' => [
+        'url' => env('CLINICO_API_URL'),
+        'token' => env('CLINICO_INTEGRACION_TOKEN'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

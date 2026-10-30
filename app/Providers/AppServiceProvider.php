@@ -25,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::define('CONSULTAR_PACIENTES', fn (UsuarioSistema $usuario): bool => $usuario->tieneAccesoContable()
+            && array_intersect(['USUARIOS_VER', 'VENTAS_REGISTRAR'], $usuario->permisosContables()) !== []);
         Gate::define('ADMINISTRAR_CATALOGO', fn (UsuarioSistema $usuario): bool => $usuario->tieneAccesoContable()
             && $usuario->rolesContables()->where('roles.codigo', 'ADMINISTRADOR')->exists());
         Gate::define('CONSULTAR_ROLES', fn (UsuarioSistema $usuario): bool => $usuario->tieneAccesoContable()

@@ -17,6 +17,10 @@ use App\Flows\Usuarios\Http\UsuariosController;
 use App\Flows\Usuarios\Http\VerificarAccesoContable;
 use App\Flows\Ventas\Http\CatalogoVentasController;
 use App\Flows\Ventas\Http\VentasController;
+use App\Http\Controllers\ClienteDesdeClinicoController;
+use App\Http\Controllers\PacientesClinicosController;
+use App\Http\Controllers\ProfesionalesController;
+use App\Http\Middleware\VerificarIntegracionClinica;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('web')->group(function (): void {
@@ -27,7 +31,14 @@ Route::middleware('web')->group(function (): void {
         ->middleware(['auth:contable', VerificarAccesoContable::class]);
 });
 
+Route::post('integraciones/clinico/clientes', ClienteDesdeClinicoController::class)
+    ->middleware(VerificarIntegracionClinica::class);
+
 Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable::class])->group(function (): void {
+    Route::get('inventario/profesionales', [ProfesionalesController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
+    Route::get('inventario/profesionales/opciones', [ProfesionalesController::class, 'opciones'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
+    Route::post('inventario/profesionales', [ProfesionalesController::class, 'store'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
+    Route::put('inventario/profesionales/{profesional}', [ProfesionalesController::class, 'update'])->whereUuid('profesional')->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::get('configuracion/cajas', [CajasController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
     Route::post('configuracion/cajas', [CajasController::class, 'store'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::get('configuracion/general', [ConfiguracionGeneralController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
@@ -66,6 +77,8 @@ Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable
     Route::get('usuarios', [UsuariosController::class, 'index'])->middleware('can:USUARIOS_VER');
     Route::get('usuarios/opciones', [UsuariosController::class, 'opciones'])->middleware('can:USUARIOS_VER');
     Route::post('usuarios', [UsuariosController::class, 'store'])->middleware('can:USUARIOS_CREAR');
+    Route::get('pacientes', PacientesClinicosController::class)->middleware('can:CONSULTAR_PACIENTES');
+    Route::post('pacientes', PacientesClinicosController::class)->middleware('can:USUARIOS_CREAR');
     Route::get('pacientes-usuarios', [PacientesUsuariosController::class, 'index'])->middleware('can:USUARIOS_VER');
     Route::post('pacientes-usuarios', [PacientesUsuariosController::class, 'store'])->middleware('can:USUARIOS_CREAR');
     Route::put('usuarios/{usuario}', [UsuariosController::class, 'update'])->whereUuid('usuario')->middleware('can:USUARIOS_CREAR');
