@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Flows\Usuarios\Models\UsuarioSistema;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ class CarritoVenta extends Model
     protected $table = 'carritos_venta';
 
     protected $fillable = [
-        'codigo', 'cliente_id', 'usuario_sistema_id', 'estado', 'moneda',
+        'codigo', 'cliente_id', 'usuario_sistema_id', 'sucursal_id', 'caja_id', 'estado', 'moneda',
         'subtotal', 'descuento', 'total', 'observaciones', 'cobrada_en', 'anulada_en',
     ];
 
@@ -34,6 +35,21 @@ class CarritoVenta extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function usuarioSistema(): BelongsTo
+    {
+        return $this->belongsTo(UsuarioSistema::class, 'usuario_sistema_id');
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(SucursalInventario::class, 'sucursal_id');
+    }
+
+    public function caja(): BelongsTo
+    {
+        return $this->belongsTo(Caja::class, 'caja_id');
     }
 
     public function detalles(): HasMany
