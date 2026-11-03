@@ -11,6 +11,7 @@ use App\Models\UnidadInventario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ItemsController extends Controller
 {
@@ -90,5 +91,24 @@ class ItemsController extends Controller
         $lote->update($request->validated());
 
         return response()->json(['data' => $lote]);
+    }
+
+    public function ubicacion(Request $request, ItemInventario $item): JsonResponse
+    {
+        $datos = $request->validate([
+            'almacen_id' => ['required', 'integer', 'exists:almacenes_inventario,id'],
+            'ubicacion' => ['required', 'string', 'max:120'],
+        ]);
+        $this->acceso->exigir((int) $datos['almacen_id']);
+        $existencia = DB::table('lotes_items as l')->join('existencias_lote as e', 'e.lote_id', '=', 'l.id')
+            ->where('l.item_id', $item->id)->where('e.almacen_id', $datos['almacen_id'])->exists();
+        abort_unless($existencia, 422, 'El ítem no tiene existencias registradas en ese almacén.');
+
+        DB::table('item_almacen_ubicaciones')->updateOrInsert(
+            ['item_id' => $item->id, 'almacen_id' => $datos['almacen_id']],
+            ['ubicacion' => trim($datos['ubicacion']), 'updated_at' => now(), 'created_at' => now()],
+        );
+
+        return response()->json(['data' => ['itemId' => $item->id, 'almacenId' => (int) $datos['almacen_id'], 'ubicacion' => trim($datos['ubicacion'])]]);
     }
 }

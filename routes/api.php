@@ -55,6 +55,7 @@ Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable
     Route::get('inventario/items', [ItemsController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
     Route::post('inventario/items', [ItemsController::class, 'store'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::put('inventario/items/{item}', [ItemsController::class, 'update'])->whereNumber('item')->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
+    Route::put('inventario/items/{item}/ubicacion', [ItemsController::class, 'ubicacion'])->whereNumber('item')->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::post('inventario/items/{item}/lotes', [ItemsController::class, 'storeLote'])->whereNumber('item')->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::put('inventario/items/{item}/lotes/{lote}', [ItemsController::class, 'updateLote'])->whereNumber('item')->whereNumber('lote')->scopeBindings()->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::get('inventario/servicios', [ServiciosController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');

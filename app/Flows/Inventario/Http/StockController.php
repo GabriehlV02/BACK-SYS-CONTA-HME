@@ -8,6 +8,7 @@ use App\Models\ExistenciaLote;
 use App\Models\LoteItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class StockController extends Controller
 {
@@ -42,6 +43,7 @@ class StockController extends Controller
             'lote' => $lote->numero, 'vence' => $lote->vencimiento?->format('Y-m-d') ?? '',
             'almacenId' => $existencia?->almacen_id, 'almacen' => $existencia?->almacen->nombre ?? 'Sin almacén asignado',
             'sucursalId' => $existencia?->almacen->sucursal_id, 'sucursal' => $existencia?->almacen->sucursal->nombre ?? 'Sin sucursal asignada',
+            'ubicacion' => $existencia ? DB::table('item_almacen_ubicaciones')->where('item_id', $item->id)->where('almacen_id', $existencia->almacen_id)->value('ubicacion') : null,
             'disponible' => $existencia ? (float) $existencia->cantidad : 0,
             'costoUnitario' => $existencia?->costo_unitario, 'fecha' => $existencia?->fecha_ingreso?->format('Y-m-d') ?? '',
             'precio1' => $lote->precio_1, 'precio2' => $lote->precio_2, 'precio3' => $lote->precio_3,
