@@ -16,5 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(GestionAccesosSeeder::class);
         $this->call(ConfiguracionInventarioSeeder::class);
+        $this->call(EspecialidadesSeeder::class);
     }
 }

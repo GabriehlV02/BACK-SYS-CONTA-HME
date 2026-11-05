@@ -18,6 +18,7 @@ use App\Flows\Usuarios\Http\VerificarAccesoContable;
 use App\Flows\Ventas\Http\CatalogoVentasController;
 use App\Flows\Ventas\Http\VentasController;
 use App\Http\Controllers\ClienteDesdeClinicoController;
+use App\Http\Controllers\EspecialidadesController;
 use App\Http\Controllers\PacientesClinicosController;
 use App\Http\Controllers\ProfesionalesController;
 use App\Http\Middleware\VerificarIntegracionClinica;
@@ -35,6 +36,9 @@ Route::post('integraciones/clinico/clientes', ClienteDesdeClinicoController::cla
     ->middleware(VerificarIntegracionClinica::class);
 
 Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable::class])->group(function (): void {
+    Route::get('especialidades', [EspecialidadesController::class, 'index']);
+    Route::post('especialidades', [EspecialidadesController::class, 'store'])->middleware('can:ROLES_GESTIONAR');
+    Route::patch('especialidades/{especialidad}', [EspecialidadesController::class, 'update'])->whereNumber('especialidad')->middleware('can:ROLES_GESTIONAR');
     Route::get('inventario/profesionales', [ProfesionalesController::class, 'index'])->middleware('can:CONSULTAR_INVENTARIO');
     Route::get('inventario/profesionales/opciones', [ProfesionalesController::class, 'opciones'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
     Route::post('inventario/profesionales', [ProfesionalesController::class, 'store'])->middleware(['can:INVENTARIO_GESTIONAR', 'can:ADMINISTRAR_CATALOGO']);
