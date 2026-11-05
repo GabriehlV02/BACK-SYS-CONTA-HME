@@ -8,6 +8,7 @@ use App\Models\CarritoVentaDetalle;
 use App\Models\Cliente;
 use Database\Seeders\GestionAccesosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -125,6 +126,24 @@ class VentaDirectaTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.codigo', 'VTA-00000001')
             ->assertJsonPath('data.0.cliente.nombre_razon_social', 'Cliente visible');
+    }
+
+    public function test_lista_pagos_clinicos_y_deja_sin_registro_los_pagos_desconocidos(): void
+    {
+        $this->autenticarAdministrador();
+        $venta = CarritoVenta::factory()->create(['cobrada_en' => '2026-10-15 09:30:00']);
+        $sinPago = CarritoVenta::factory()->create(['cobrada_en' => '2026-10-15 08:30:00']);
+        DB::table('ventas_clinicas_solicitudes')->insert([
+            'solicitud_id' => (string) Str::uuid(), 'usuario_id' => auth('contable')->id(), 'venta_id' => $venta->id,
+            'huella' => str_repeat('a', 64), 'pagos' => json_encode([['metodo' => 'Efectivo', 'monto' => '20.00']], JSON_THROW_ON_ERROR),
+            'cambio' => '2.00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/v1/ventas?fecha_desde=2026-10-15&fecha_hasta=2026-10-15')
+            ->assertOk()->assertJsonPath('data.0.id', $venta->id)
+            ->assertJsonPath('data.0.pagos.0.metodo', 'Efectivo')
+            ->assertJsonPath('data.1.id', $sinPago->id)
+            ->assertJsonPath('data.1.pagos', null);
     }
 
     private function autenticarAdministrador(): void

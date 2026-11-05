@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class VentasController
@@ -50,7 +51,17 @@ class VentasController
                 });
             })
             ->orderByDesc('cobrada_en')
+            ->orderByDesc('id')
             ->paginate($datos['per_page'] ?? 50);
+
+        $pagos = Schema::hasTable('ventas_clinicas_solicitudes')
+            ? DB::table('ventas_clinicas_solicitudes')->whereIn('venta_id', $ventas->getCollection()->pluck('id'))->get(['venta_id', 'pagos', 'cambio'])->keyBy('venta_id')
+            : collect();
+        $ventas->getCollection()->each(function (CarritoVenta $venta) use ($pagos): void {
+            $registro = $pagos->get($venta->id);
+            $venta->setAttribute('pagos', $registro ? json_decode($registro->pagos, true, 512, JSON_THROW_ON_ERROR) : null);
+            $venta->setAttribute('cambio', $registro?->cambio);
+        });
 
         return response()->json(['data' => $ventas->items(), 'current_page' => $ventas->currentPage(), 'last_page' => $ventas->lastPage(), 'total' => $ventas->total()]);
     }
