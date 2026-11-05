@@ -24,16 +24,18 @@ class GuardarServicioRequest extends FormRequest
         $clave = fn (string $campo): string => is_string($this->input($campo)) ? Str::upper(Str::ascii(trim($this->input($campo)))) : '';
         $categoria = CategoriaInventario::where('clave', $clave('categoria'))->first();
         $tipo = is_string($this->input('tipoOpcion')) ? 'tipoOpcion' : 'tipo';
+        $servicio = $this->route('servicio');
+        $tipoId = $this->has($tipo) ? TipoInventario::where('clave', $clave($tipo))->value('id') : ($servicio?->tipo_id ?? TipoInventario::where('tipo_base', 'SERVICIO')->where('activo', true)->orderBy('clave')->value('id'));
         $this->merge([
             'nombre' => $nombre, 'clave' => Str::upper(Str::ascii($nombre)),
-            'tipo_id' => TipoInventario::where('clave', $clave($tipo))->value('id'),
-            'categoria_id' => $categoria?->id,
-            'subcategoria_id' => $categoria ? SubcategoriaInventario::where('categoria_id', $categoria->id)->where('clave', $clave('grupo'))->value('id') : null,
-            'unidad_id' => UnidadInventario::where('clave', $clave('unidadMedida'))->value('id'),
-            'clasificacion_id' => $clave('clasificacion') !== '' ? ClasificacionInventario::where('clave', $clave('clasificacion'))->value('id') : null,
+            'tipo_id' => $tipoId,
+            'categoria_id' => $this->has('categoria') ? $categoria?->id : $servicio?->categoria_id,
+            'subcategoria_id' => $this->has('grupo') ? ($categoria ? SubcategoriaInventario::where('categoria_id', $categoria->id)->where('clave', $clave('grupo'))->value('id') : null) : $servicio?->subcategoria_id,
+            'unidad_id' => $this->has('unidadMedida') ? UnidadInventario::where('clave', $clave('unidadMedida'))->value('id') : $servicio?->unidad_id,
+            'clasificacion_id' => $this->has('clasificacion') ? ($clave('clasificacion') !== '' ? ClasificacionInventario::where('clave', $clave('clasificacion'))->value('id') : null) : $servicio?->clasificacion_id,
             'precio_venta' => $this->input('precioVenta'),
-            'numero_serie' => $this->boolean('usarNumeroSerie') ? $this->input('numeroSerie') : null,
-            'estado' => $clave('estado'),
+            'numero_serie' => $this->has('usarNumeroSerie') ? ($this->boolean('usarNumeroSerie') ? $this->input('numeroSerie') : null) : $servicio?->numero_serie,
+            'estado' => $this->has('estado') ? $clave('estado') : ($servicio?->estado ?? 'ACTIVO'),
         ]);
     }
 
@@ -44,9 +46,9 @@ class GuardarServicioRequest extends FormRequest
             'clave' => ['required', 'string', 'max:150', Rule::unique('servicios', 'clave')->ignore($this->route('servicio'))],
             'descripcion' => ['required', 'string', 'max:1000'],
             'tipo_id' => ['required', 'uuid', Rule::exists('tipos_inventario', 'id')->where('activo', true)->where('tipo_base', 'SERVICIO')],
-            'categoria_id' => ['required', 'uuid', Rule::exists('categorias_inventario', 'id')->where('activo', true)],
-            'subcategoria_id' => ['required', 'uuid', Rule::exists('subcategorias_inventario', 'id')->where('activo', true)->where('categoria_id', $this->input('categoria_id'))],
-            'unidad_id' => ['required', 'uuid', Rule::exists('unidades_inventario', 'id')->where('activo', true)],
+            'categoria_id' => [Rule::requiredIf($this->filled('categoria')), 'nullable', 'uuid', Rule::exists('categorias_inventario', 'id')->where('activo', true)],
+            'subcategoria_id' => [Rule::requiredIf($this->filled('grupo')), 'nullable', 'uuid', Rule::exists('subcategorias_inventario', 'id')->where('activo', true)->where('categoria_id', $this->input('categoria_id'))],
+            'unidad_id' => [Rule::requiredIf($this->filled('unidadMedida')), 'nullable', 'uuid', Rule::exists('unidades_inventario', 'id')->where('activo', true)],
             'clasificacion' => ['nullable', 'string', Rule::exists('clasificaciones_inventario', 'clave')->where('activo', true)],
             'clasificacion_id' => ['nullable', 'uuid', Rule::exists('clasificaciones_inventario', 'id')->where('activo', true)],
             'precio_venta' => ['required', 'numeric', 'min:0', 'max:9999999999.99', 'decimal:0,2'],

@@ -19,6 +19,23 @@ class ServiciosTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Servicio::query()->delete();
+    }
+
+    public function test_registra_y_edita_servicio_con_nombre_precio_y_descripcion(): void
+    {
+        $this->administrador();
+        TipoInventario::factory()->create(['tipo_base' => 'SERVICIO', 'activo' => true]);
+        $datos = ['nombre' => 'Consulta nueva', 'descripcion' => 'Atención ambulatoria', 'precioVenta' => '75.50'];
+        $id = $this->postJson('/api/v1/inventario/servicios', $datos)->assertCreated()->assertJsonPath('data.unidadMedida', '')->json('data.id');
+        $this->assertDatabaseHas('servicios', ['id' => $id, 'categoria_id' => null, 'subcategoria_id' => null, 'unidad_id' => null]);
+        $this->putJson('/api/v1/inventario/servicios/'.$id, [...$datos, 'precioVenta' => '90.00'])->assertOk()->assertJsonPath('data.precioVenta', '90.00');
+        $this->getJson('/api/v1/ventas/catalogo')->assertOk()->assertJsonFragment(['nombre' => 'Consulta nueva']);
+    }
+
     private function administrador(): void
     {
         $this->seed(GestionAccesosSeeder::class);
@@ -48,7 +65,7 @@ class ServiciosTest extends TestCase
         $respuesta->assertJsonPath('data.codigo', 'SRV-'.str_pad((string) $id, 6, '0', STR_PAD_LEFT));
         $this->assertDatabaseHas('servicios', ['id' => $id, 'nombre' => $datos['nombre'], 'precio_venta' => '50.25']);
         $this->getJson('/api/v1/inventario/servicios')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id);
-        $this->getJson('/api/v1/inventario/configuracion')->assertOk()->assertJsonPath('data.tipos.0.cantidad', 1);
+        $this->getJson('/api/v1/inventario/configuracion')->assertOk()->assertJsonFragment(['clave' => $datos['tipoOpcion'], 'cantidad' => 1]);
     }
 
     public function test_actualiza_servicio_conservando_codigo_y_puede_desactivarlo(): void
@@ -146,6 +163,6 @@ class ServiciosTest extends TestCase
         $this->administrador();
         $this->getJson('/api/v1/inventario/servicios')->assertOk()->assertJsonCount(0, 'data');
         $this->postJson('/api/v1/inventario/servicios', [])->assertUnprocessable()
-            ->assertJsonValidationErrors(['nombre', 'descripcion', 'tipo_id', 'categoria_id', 'subcategoria_id', 'unidad_id', 'precio_venta', 'estado']);
+            ->assertJsonValidationErrors(['nombre', 'descripcion', 'precio_venta']);
     }
 }

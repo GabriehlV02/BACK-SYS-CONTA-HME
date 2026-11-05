@@ -46,7 +46,7 @@ class CatalogoVentasController
             'precio' => (float) $e->lote->precio_1, 'stock' => (float) $e->cantidad, 'almacenId' => $e->almacen_id,
         ]);
         $servicios = Servicio::with('categoria')->where('estado', 'ACTIVO')
-            ->whereHas('tipo', fn (Builder $q) => $q->where('activo', true))->whereHas('unidad', fn (Builder $q) => $q->where('activo', true))
+            ->whereHas('tipo', fn (Builder $q) => $q->where('activo', true))->where(fn (Builder $q) => $q->whereNull('unidad_id')->orWhereHas('unidad', fn (Builder $unidad) => $unidad->where('activo', true)))
             ->orderBy('nombre')->get()->map(fn (Servicio $s): array => [
                 'id' => 'servicio-'.$s->id, 'codigo' => 'SRV-'.str_pad((string) $s->id, 6, '0', STR_PAD_LEFT), 'nombre' => $s->nombre, 'tipo' => 'Servicio',
                 'categoria' => $s->categoria?->nombre ?? '', 'precio' => (float) $s->precio_venta,
