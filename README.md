@@ -1,58 +1,62 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema Contable HME · API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API del Sistema Contable HME, construida con Laravel. Gestiona autenticación, inventario, existencias, almacenes, adquisiciones, ventas y configuración para el [frontend contable](https://github.com/GabriehlV02/FRONT-SYS-CONTA-HME). También expone la integración autenticada utilizada por el Sistema Clínico HME.
 
-## About Laravel
+[![Laravel](https://img.shields.io/badge/Laravel-13.x-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
+[![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-base_de_datos-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Responsabilidades
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Autenticación y autorización basada en permisos.
+- Catálogos de productos, insumos, servicios y profesionales.
+- Inventario, stock por almacén, lotes y movimientos.
+- Adquisiciones, ventas, caja y reportes operativos.
+- Sincronización autenticada de clientes con el sistema clínico.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Las rutas se encuentran en `routes/api.php`; las reglas de dominio y persistencia se organizan bajo `app/Flows/` y `app/`.
 
-## Learning Laravel
+## Requisitos
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP 8.3 o posterior y Composer.
+- PostgreSQL compatible con la configuración del proyecto.
+- Node.js y npm solo si vas a compilar recursos frontend empaquetados por Laravel.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Instalación local
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+1. Crea una base PostgreSQL local y configura las variables `DB_*` de `.env`.
+2. Instala las dependencias y prepara la aplicación:
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```powershell
+composer install
+Copy-Item .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve --host 127.0.0.1 --port 5055
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+La API quedará disponible en `http://127.0.0.1:5055`, que es el destino esperado por el frontend contable en desarrollo. Ajusta `VITE_API_TARGET` si utilizas otro puerto.
 
-## Contributing
+Configura `CLINICO_API_URL` y `CLINICO_INTEGRACION_TOKEN` únicamente cuando habilites la integración clínica. Los tokens, claves y credenciales deben permanecer fuera del repositorio. En entornos publicados, configura `APP_DEBUG=false`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Comandos útiles
 
-## Code of Conduct
+```powershell
+php artisan route:list --path=api
+php artisan migrate:status
+php artisan test
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Estructura
 
-## Security Vulnerabilities
+```text
+app/          # flujos de dominio, controladores, middleware y servicios
+routes/       # rutas HTTP
+database/     # migraciones, factories y seeders
+tests/        # pruebas automatizadas
+config/       # configuración de Laravel
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Seguridad
 
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+No compartas archivos `.env`, tokens de integración, credenciales de base de datos ni información de pacientes o transacciones reales. Revisa los permisos de cada cuenta antes de habilitar acceso a módulos operativos.
