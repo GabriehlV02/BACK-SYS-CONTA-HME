@@ -69,11 +69,14 @@ class StockInventarioTest extends TestCase
         $segundo = AlmacenInventario::factory()->create(['sucursal_id' => $sucursal->id, 'nombre' => 'Central']);
         ExistenciaLote::factory()->create(['lote_id' => $lote->id, 'almacen_id' => $primero->id, 'cantidad' => '10.125', 'costo_unitario' => '8.4321']);
         ExistenciaLote::factory()->create(['lote_id' => $lote->id, 'almacen_id' => $segundo->id, 'cantidad' => '20.250']);
+        DB::table('item_almacen_ubicaciones')->insert(['item_id' => $lote->item_id, 'almacen_id' => $primero->id, 'ubicacion' => 'Estante A']);
         $respuesta = $this->getJson('/api/v1/stock/lotes')->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.sin_ingresos', 0);
         $filas = collect($respuesta->json('data'));
         $this->assertEquals(30.375, $filas->sum('disponible'));
         $this->assertCount(2, $filas->pluck('id')->unique());
         $this->assertSame('8.4321', $filas->firstWhere('almacenId', $primero->id)['costoUnitario']);
+        $this->assertSame('Estante A', $filas->firstWhere('almacenId', $primero->id)['ubicacion']);
+        $this->assertNull($filas->firstWhere('almacenId', $segundo->id)['ubicacion']);
         $this->assertSame('Casa matriz', $filas->first()['sucursal']);
     }
 
@@ -127,5 +130,6 @@ class StockInventarioTest extends TestCase
         $consultas = collect(DB::getQueryLog())->filter(fn (array $consulta): bool => str_starts_with(strtolower($consulta['query']), 'select'));
         DB::disableQueryLog();
         $this->assertLessThan(35, $consultas->count());
+        $this->assertCount(1, $consultas->filter(fn (array $consulta): bool => str_contains(strtolower($consulta['query']), 'item_almacen_ubicaciones')));
     }
 }

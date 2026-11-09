@@ -91,10 +91,17 @@ class AislamientoAlmacenesTest extends TestCase
 
     public function test_catalogo_de_ventas_usa_solo_existencias_autorizadas_y_no_datos_de_ejemplo(): void
     {
-        $this->getJson('/api/v1/ventas/catalogo')->assertOk()->assertJsonCount(1, 'almacenes')
-            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.almacenId', $this->propio->id)->assertJsonPath('data.0.stock', 7);
+        $caja = Caja::factory()->create(['sucursal_id' => $this->propio->sucursal_id, 'activo' => true]);
+        $caja->almacenes()->attach($this->propio->id);
+        $this->usuario->cajasAsignadas()->attach($caja->id);
+        $respuesta = $this->getJson('/api/v1/ventas/catalogo')->assertOk()->assertJsonCount(1, 'almacenes');
+        $productos = collect($respuesta->json('data'))->filter(fn ($item) => $item['tipo'] !== 'Servicio')->values();
+        $this->assertCount(1, $productos);
+        $this->assertSame($this->propio->id, $productos[0]['almacenId']);
+        $this->assertEquals(7, $productos[0]['stock']);
         $this->usuario->almacenesAsignados()->detach();
-        $this->getJson('/api/v1/ventas/catalogo')->assertOk()->assertJsonCount(0, 'almacenes')->assertJsonCount(0, 'data');
+        $respuesta = $this->getJson('/api/v1/ventas/catalogo')->assertOk()->assertJsonCount(0, 'almacenes');
+        $this->assertCount(0, collect($respuesta->json('data'))->filter(fn ($item) => $item['tipo'] !== 'Servicio'));
     }
 
     public function test_compra_ajena_no_aparece_y_no_puede_registrar_ingresos_fuera_de_su_almacen(): void

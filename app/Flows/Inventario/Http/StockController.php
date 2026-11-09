@@ -18,18 +18,23 @@ class StockController extends Controller
         $ids = $acceso->ids();
         $lotes = $acceso->lotes(LoteItem::with(['item.productoBase.tipo', 'item.productoBase.categoria', 'item.productoBase.subcategoria', 'item.unidad', 'existencias.almacen.sucursal']))
             ->with(['existencias' => fn ($q) => $q->when($ids !== null, fn (Builder $q) => $q->whereIn('almacen_id', $ids))])->orderBy('item_id')->orderBy('numero')->get();
-        $datos = $lotes->flatMap(function (LoteItem $lote): array {
+        $ubicaciones = DB::table('item_almacen_ubicaciones')
+            ->whereIntegerInRaw('item_id', $lotes->pluck('item_id')->unique())
+            ->when($ids !== null, fn ($query) => $query->whereIntegerInRaw('almacen_id', $ids))
+            ->get(['item_id', 'almacen_id', 'ubicacion'])
+            ->keyBy(fn ($ubicacion) => $ubicacion->item_id.':'.$ubicacion->almacen_id);
+        $datos = $lotes->flatMap(function (LoteItem $lote) use ($ubicaciones): array {
             if ($lote->existencias->isEmpty()) {
-                return [$this->datos($lote, null)];
+                return [$this->datos($lote, null, null)];
             }
 
-            return $lote->existencias->map(fn (ExistenciaLote $existencia): array => $this->datos($lote, $existencia))->all();
+            return $lote->existencias->map(fn (ExistenciaLote $existencia): array => $this->datos($lote, $existencia, $ubicaciones->get($lote->item_id.':'.$existencia->almacen_id)?->ubicacion))->all();
         })->values();
 
         return response()->json(['data' => $datos, 'meta' => ['registros' => $datos->count(), 'sin_ingresos' => $datos->whereNull('almacenId')->count()]]);
     }
 
-    private function datos(LoteItem $lote, ?ExistenciaLote $existencia): array
+    private function datos(LoteItem $lote, ?ExistenciaLote $existencia, ?string $ubicacion): array
     {
         $item = $lote->item;
         $grupo = $item->productoBase;
@@ -43,7 +48,7 @@ class StockController extends Controller
             'lote' => $lote->numero, 'vence' => $lote->vencimiento?->format('Y-m-d') ?? '',
             'almacenId' => $existencia?->almacen_id, 'almacen' => $existencia?->almacen->nombre ?? 'Sin almacén asignado',
             'sucursalId' => $existencia?->almacen->sucursal_id, 'sucursal' => $existencia?->almacen->sucursal->nombre ?? 'Sin sucursal asignada',
-            'ubicacion' => $existencia ? DB::table('item_almacen_ubicaciones')->where('item_id', $item->id)->where('almacen_id', $existencia->almacen_id)->value('ubicacion') : null,
+            'ubicacion' => $ubicacion,
             'disponible' => $existencia ? (float) $existencia->cantidad : 0,
             'costoUnitario' => $existencia?->costo_unitario, 'fecha' => $existencia?->fecha_ingreso?->format('Y-m-d') ?? '',
             'precio1' => $lote->precio_1, 'precio2' => $lote->precio_2, 'precio3' => $lote->precio_3,

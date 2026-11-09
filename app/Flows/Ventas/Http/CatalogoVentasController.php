@@ -19,7 +19,7 @@ class CatalogoVentasController
         abort_unless($usuario, 401);
         $esAdministrador = $usuario->rolesContables()->where('roles.codigo', 'ADMINISTRADOR')->exists();
         $almacenesPermitidos = $acceso->ids();
-        $cajas = Caja::query()->with(['sucursal:id,nombre', 'almacenes' => function (Builder $query) use ($almacenesPermitidos): void {
+        $cajas = Caja::query()->with(['sucursal:id,nombre', 'almacenes' => function ($query) use ($almacenesPermitidos): void {
             $query->where('almacenes_inventario.activo', true)
                 ->when($almacenesPermitidos !== null, fn (Builder $q) => $q->whereIn('almacenes_inventario.id', $almacenesPermitidos));
         }])->where('activo', true)
