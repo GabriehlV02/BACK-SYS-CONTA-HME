@@ -20,6 +20,7 @@ use App\Flows\Ventas\Http\VentasController;
 use App\Http\Controllers\ClienteDesdeClinicoController;
 use App\Http\Controllers\EspecialidadesController;
 use App\Http\Controllers\PacientesClinicosController;
+use App\Http\Controllers\CuentasEmergenciasController;
 use App\Http\Controllers\ProfesionalesController;
 use App\Http\Middleware\VerificarIntegracionClinica;
 use Illuminate\Support\Facades\Route;
@@ -77,6 +78,7 @@ Route::prefix('v1')->middleware(['web', 'auth:contable', VerificarAccesoContable
     Route::get('clientes', [ClientesController::class, 'index'])->middleware('can:VENTAS_VER');
     Route::post('clientes', [ClientesController::class, 'store'])->middleware('can:VENTAS_REGISTRAR');
     Route::get('ventas', [VentasController::class, 'index'])->middleware('can:VENTAS_VER');
+    Route::get('cuentas-emergencias', CuentasEmergenciasController::class)->middleware('can:VENTAS_VER');
     Route::get('ventas/catalogo', CatalogoVentasController::class)->middleware('can:VENTAS_REGISTRAR');
     Route::post('ventas', [VentasController::class, 'store'])->middleware('can:VENTAS_REGISTRAR');
     Route::get('usuarios', [UsuariosController::class, 'index'])->middleware('can:USUARIOS_VER');

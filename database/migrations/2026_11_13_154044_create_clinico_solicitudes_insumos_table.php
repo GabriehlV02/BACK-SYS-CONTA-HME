@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('clinico_solicitudes_insumos')) {
+            return;
+        }
         Schema::create('clinico_solicitudes_insumos', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('solicitado_por');
